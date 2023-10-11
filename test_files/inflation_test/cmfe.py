@@ -6,6 +6,7 @@ Descrption: cmiss setup funtions for finite element implementation of
 
 import numpy as np
 from opencmiss.iron import iron
+import meshio
 
 # Runtime required parameters
 DIM = 3
@@ -30,6 +31,7 @@ def coordinate_setup(coord_n, dim):
     coord_sys.DimensionSet(dim)
     # - 1
     coord_sys.CreateFinish()
+    print('+==+ ^\_/^ COORDINATES COMPLETE')
     return coord_sys
 
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
@@ -55,6 +57,7 @@ def basis_setup(basis_n, xi_n):
     basis.QuadratureNumberOfGaussXiSet([3]*xi_n)
     # - 1
     basis.CreateFinish()
+    print('+==+ ^\_/^ BASIS COMPLETE')
     return basis
 
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
@@ -72,6 +75,7 @@ def region_setup(region_n, coord_sys):
     region.LabelSet("Region")
     # - 1
     region.CreateFinish()
+    print('+==+ ^\_/^ REGION COMPLETE')
     return region
 
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
@@ -105,6 +109,7 @@ def mesh_setup(region, n_n, mesh_n, dim, e_n, basis, e_idx, e_np_map):
     mesh_e.CreateFinish()
     # - 2
     mesh.CreateFinish()
+    print('+==+ ^\_/^ MESH COMPLETE')
     return mesh_e, mesh
 
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
@@ -127,6 +132,7 @@ def decomposition_setup(mesh, decomp_n):
     decomp.NumberOfDomainsSet(comp_nodes_n)
     # - 1
     decomp.CreateFinish()
+    print('+==+ ^\_/^ DECOMPOSITION COMPLETE')
     return decomp
 
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
@@ -181,6 +187,7 @@ def geometric_setup(geo_field_n, region, decomp, n_n, n_idx, n_xyz):
         )
     # - 2
     geo_field.ParameterSetUpdateFinish(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES)
+    print('+==+ ^\_/^ GEOMETRIC FIELD COMPLETE')
     return geo_field
 
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
@@ -223,6 +230,7 @@ def material_setup(mat_field_n, decomp, geo_field, region, c):
         iron.FieldParameterSetTypes.VALUES, 
         2, c[1]
     )
+    print('+==+ ^\_/^ MATERIAL FIELD COMPLETE')
     return mat_field
 
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
@@ -244,6 +252,7 @@ def dependent_setup(dep_field_n, region, decomp, geo_field):
     dep_field.GeometricFieldSet(geo_field)
     dep_field.DependentTypeSet(iron.FieldDependentTypes.DEPENDENT)
     dep_field.VariableLabelSet(iron.FieldVariableTypes.U, "Dependent")
+    dep_field.NumberOfVariablesSet(2)
     dep_field.NumberOfComponentsSet(iron.FieldVariableTypes.U, 4)
     dep_field.NumberOfComponentsSet(iron.FieldVariableTypes.DELUDELN, 4)  
     dep_field.ComponentInterpolationSet(
@@ -278,6 +287,7 @@ def dependent_setup(dep_field_n, region, decomp, geo_field):
         dep_field, iron.FieldVariableTypes.U, 
         iron.FieldParameterSetTypes.VALUES, P, 0.0
     )
+    print('+==+ ^\_/^ DEPENDENT FIELD COMPLETE')
     return dep_field
 
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
@@ -321,6 +331,7 @@ def equations_setup(eqs_field_n, eqs_set_n, region, geo_field, dep_field_n, dep_
     eqs.OutputTypeSet(iron.EquationsOutputTypes.NONE)
     # - 4
     eqs_set.EquationsCreateFinish()
+    print('+==+ ^\_/^ EQUATIONS FIELD COMPLETE')
     return eqs_set_field, eqs_set, eqs
 
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
@@ -328,7 +339,7 @@ def equations_setup(eqs_field_n, eqs_set_n, region, geo_field, dep_field_n, dep_
 #    
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
 
-def problem_setup():
+def problem_solver_setup(problem_n, eqs_set, loadsteps):
     problem = iron.Problem()
     problems_specs = (
         [
@@ -337,100 +348,105 @@ def problem_setup():
             iron.ProblemSubtypes.NONE
         ]
     )
-    problem.CreateStart(prob_n, problems_specs)
+    # + 1
+    problem.CreateStart(problem_n, problems_specs)
+    # - 1
     problem.CreateFinish()
-    #
+    # + 2
     problem.ControlLoopCreateStart()
     ctrl_loop = iron.ControlLoop()
-    problem.ControlLoopGet([iron.ControlLoopIdentifiers.NODE], ctrl_loop)
-    ctrl_loop.MaximumIterationsSet(LOADSTEPS)
+    problem.ControlLoopGet(
+        [iron.ControlLoopIdentifiers.NODE], 
+        ctrl_loop
+    )
+    ctrl_loop.MaximumIterationsSet(loadsteps)
+    # - 2
     problem.ControlLoopCreateFinish()
-
-    return problem, ctrl_loop
-
-def solver_setup(problem, eqs_set):
-    nl_solver = iron.Solver()
-    li_solver = iron.Solver()
+    print('+==+ ^\_/^ PROBLEM SETUP COMPLETE')
+    non_solver = iron.Solver()
+    lin_solver = iron.Solver()
+    # + 3
     problem.SolversCreateStart()
     problem.SolverGet(
         [iron.ControlLoopIdentifiers.NODE], 
         1, 
-        nl_solver
+        non_solver
     )
-    nl_solver.OutputTypeSet(iron.SolverOutputTypes.PROGRESS)
-    nl_solver.NewtonJacobianCalculationTypeSet(
+    non_solver.OutputTypeSet(iron.SolverOutputTypes.PROGRESS)
+    non_solver.NewtonJacobianCalculationTypeSet(
         iron.JacobianCalculationTypes.EQUATIONS
     )
-    nl_solver.NewtonLinearSolverGet(li_solver)
-    li_solver.LinearTypeSet(iron.LinearSolverTypes.DIRECT)
+    non_solver.NewtonLinearSolverGet(lin_solver)
+    lin_solver.LinearTypeSet(iron.LinearSolverTypes.DIRECT)
+    # - 3
     problem.SolversCreateFinish()
     # 
     solver = iron.Solver()
     solver_eqs = iron.SolverEquations()
+    # + 4
     problem.SolverEquationsCreateStart()
-    problem.SolverGet([iron.ControlLoopIdentifiers.NODE], 1, solver)
+    problem.SolverGet(
+        [iron.ControlLoopIdentifiers.NODE], 
+        1, solver
+        )
     solver.SolverEquationsGet(solver_eqs)
     solver_eqs.SparsityTypeSet(iron.SolverEquationsSparsityTypes.SPARSE)
     _ = solver_eqs.EquationsSetAdd(eqs_set)
+    # - 4
     problem.SolverEquationsCreateFinish()
-
-    return problem, nl_solver, li_solver, solver, solver_eqs
+    print('+==+ ^\_/^ SOLVER SETUP COMPLETE')
+    return problem, solver, solver_eqs
 
 def boundary_conditions_setup(solver_eqs, dep_field, n_n, n_np_xyz):
     bcs = iron.BoundaryConditions()
     solver_eqs.BoundaryConditionsCreateStart(bcs)
-    
     for i in range(0, n_n, 1):
-
         if (n_np_xyz[i, 2] == np.min(n_np_xyz[:, 2])) or (n_np_xyz[i, 2] == np.max(n_np_xyz[:, 2])):
-            # bcs.AddNode(dep_field, iron.FieldVariableTypes.U,1,1,i,X,iron.BoundaryConditionsTypes.FIXED,0.0)
-            # bcs.AddNode(dep_field, iron.FieldVariableTypes.U,1,1,i,Y,iron.BoundaryConditionsTypes.FIXED,0.0)
             bcs.AddNode(
                 dep_field, 
                 iron.FieldVariableTypes.U,
                 1,
                 1,
-                i,
+                i+1,
                 Z,
                 iron.BoundaryConditionsTypes.FIXED,
                 0.0
             )
 
-        vecNorm = np.linalg.norm([n_np_xyz[i, 0], n_np_xyz[i, 1]])
-        if abs(vecNorm - INNER_RAD) < 1e-5:
-            bcs.AddNode(
-                dep_field, 
-                iron.FieldVariableTypes.U,
-                1,
-                1,
-                i,
-                X,
-                iron.BoundaryConditionsTypes.PRESSURE,
-                1.5
-            )
-            bcs.AddNode(
-                dep_field, 
-                iron.FieldVariableTypes.U,
-                1,
-                1,
-                i,
-                Y,
-                iron.BoundaryConditionsTypes.PRESSURE,
-                1.5
-            )
-            bcs.AddNode(
-                dep_field, 
-                iron.FieldVariableTypes.U,
-                1,
-                1,
-                i,
-                Z,
-                iron.BoundaryConditionsTypes.PRESSURE,
-                1.5
-            )
-
+        # vecNorm = np.linalg.norm([n_np_xyz[i, 0], n_np_xyz[i, 1]])
+        # if abs(vecNorm - INNER_RAD) < 1e-5:
+        #     bcs.AddNode(
+        #         dep_field, 
+        #         iron.FieldVariableTypes.U,
+        #         1,
+        #         1,
+        #         i,
+        #         X,
+        #         iron.BoundaryConditionsTypes.PRESSURE,
+        #         1.5
+        #     )
+        #     bcs.AddNode(
+        #         dep_field, 
+        #         iron.FieldVariableTypes.U,
+        #         1,
+        #         1,
+        #         i,
+        #         Y,
+        #         iron.BoundaryConditionsTypes.PRESSURE,
+        #         1.5
+        #     )
+        #     bcs.AddNode(
+        #         dep_field, 
+        #         iron.FieldVariableTypes.U,
+        #         1,
+        #         1,
+        #         i,
+        #         Z,
+        #         iron.BoundaryConditionsTypes.PRESSURE,
+        #         1.5
+        #     )
+    print('+==+ ^\_/^ BOUNDARY CONDITIONS COMPLETE')
     solver_eqs.BoundaryConditionsCreateFinish()
-
     return bcs, solver_eqs
 
 def output(region, decomp, dep_field, mesh, geo_field, n_n, e_n, mesh_e):
@@ -578,5 +594,5 @@ def output(region, decomp, dep_field, mesh, geo_field, n_n, e_n, mesh_e):
     meshio.write_points_cells("/home/jovyan/work/test_files/runtime_files/output_mesh.vtk",points, cells, point_data)
 
     meshio.write_points_cells("/home/jovyan/work/test_files/runtime_files/output_mesh_iron.vtk",points,cells, point_data)
-
+    print('+==+ ^\_/^ EXPORT COMPLETE')
     return

@@ -73,59 +73,65 @@ def elems(test_name):
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
 
 def main(test_name):
-    # Load node and element data
+
+    # +============+  
+    # Node and Element infrastructure
+    # +============+ 
+
     n_np_xyz, n_idx, n_n = nodes(test_name)
     e_np_map, e_idx, e_n = elems(test_name)
 
-    # +==+ computational infrastructure
-    
-    # Coordiante system
+    # +============+  
+    # Base infrastructure
+    # +============+  
+   
     cmfe_coord = cmfe.coordinate_setup(coord_n, DIM)
-    # Basis {LAGRANGE_HERMITE_TP & QUADRATIC_LAGRANGE}
     cmfe_basis = cmfe.basis_setup(basis_n, XI_N)
-    # Region
     cmfe_region = cmfe.region_setup(region_n, cmfe_coord)
-    # Mesh (?)
-    cmfe_mesh_elem, cmfe_mesh = cmfe.mesh_setup(
+    _, cmfe_mesh = cmfe.mesh_setup(
         cmfe_region, n_n, mesh_n, DIM, 
         e_n, cmfe_basis, e_idx, e_np_map
     )
-    # Decomposition {CALCULATED}
     cmfe_decomp = cmfe.decomposition_setup(cmfe_mesh, decomp_n)
 
-    # +==+ field infrastructure
+    # +============+  
+    # Field and Equation infrastructure
+    # +============+  
 
-    # Geometric Field Setup {VALUES}
     cmfe_geo_field = cmfe.geometric_setup(geo_field_n, cmfe_region, cmfe_decomp, n_n, n_idx, n_np_xyz)
-    # Material Field {ELEMENT_BASED, VALUES}
     cmfe_mat_field = cmfe.material_setup(mat_field_n, cmfe_decomp, cmfe_geo_field, cmfe_region, C_VALS)
-    # Dependent Field {GEOMETRIC_GENERAL, DEPENDENT, DELUDELN, ELEMENT_BASED & VALUES}
     cmfe_dep_field = cmfe.dependent_setup(dep_field_n, cmfe_region, cmfe_decomp, cmfe_geo_field)
-    # Equation Field {ELASTICITY, FINITE_ELASTICITY, MOONEY_RIVLIN, SPARSE & NONE}
-    cmfe_eqs_set_field, cmfe_eqs_set, cmfe_eqs = cmfe.equations_setup(
+    _, cmfe_eqs_set, _ = cmfe.equations_setup(
         eqs_field_n, eqs_set_n, cmfe_region, 
         cmfe_geo_field, dep_field_n, cmfe_dep_field, 
         mat_field_n, cmfe_mat_field
     )
 
-    # +==+ solution infrastructure
+    # +============+ 
+    # Problem and Solution infrastructure
+    # +============+ 
     
-    problem, ctrl_loop = cmfe.problem_setup()
-    problem, nl_solver, li_solver, solver, solver_eqs = cmfe.solver_setup(problem, eqs_set)
-    bcs, solver_eqs = cmfe.boundary_conditions_setup(solver_eqs, dep_field, n_n, n_np_xyz)
+    cmfe_problem, _, cmfe_solver_eqs = cmfe.problem_solver_setup(problem_n, cmfe_eqs_set, LOADSTEPS)
+    _, _ = cmfe.boundary_conditions_setup(cmfe_solver_eqs, cmfe_dep_field, n_n, n_np_xyz)
+
+    # +============+ 
+    # Solve
+    # +============+  
 
     try:
-        problem.Solve()
+        cmfe_problem.Solve()
     except:
         print("Failed")
 
-    cmfe.output(region, decomp, dep_field, mesh, geo_field, n_n, e_n, mesh_e)
+    # +============+ 
+    # Export and Complete
+    # +============+ 
 
     # Wrap it up
-    problem.Destroy()
-    coord_sys.Destroy()
-    region.Destroy()
-    basis.Destroy()
+    cmfe_problem.Destroy()
+    cmfe_coord.Destroy()
+    cmfe_region.Destroy()
+    cmfe_basis.Destroy()
     iron.Finalise()
 
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
