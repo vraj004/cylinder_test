@@ -26,10 +26,8 @@ RUNTIME_PATH = "/home/jovyan/work/docker-iron/test_files/inflation_test/runtime_
 
 def coordinate_setup(coord_n, dim):
     coord_sys = iron.CoordinateSystem()
-    # + 1
     coord_sys.CreateStart(coord_n)
     coord_sys.DimensionSet(dim)
-    # - 1
     coord_sys.CreateFinish()
     print('+==+ ^\_/^ COORDINATES COMPLETE')
     return coord_sys
@@ -47,7 +45,6 @@ def coordinate_setup(coord_n, dim):
 
 def basis_setup(basis_n, xi_n):
     basis = iron.Basis()
-    # + 1
     basis.CreateStart(basis_n)
     basis.TypeSet(iron.BasisTypes.LAGRANGE_HERMITE_TP)
     basis.NumberOfXiSet(xi_n)
@@ -55,7 +52,6 @@ def basis_setup(basis_n, xi_n):
         [iron.BasisInterpolationSpecifications.QUADRATIC_LAGRANGE] * xi_n
     )
     basis.QuadratureNumberOfGaussXiSet([3]*xi_n)
-    # - 1
     basis.CreateFinish()
     print('+==+ ^\_/^ BASIS COMPLETE')
     return basis
@@ -69,48 +65,12 @@ def basis_setup(basis_n, xi_n):
 
 def region_setup(region_n, coord_sys):
     region = iron.Region()
-    # + 1
     region.CreateStart(region_n, iron.WorldRegion)
     region.CoordinateSystemSet(coord_sys)
     region.LabelSet("Region")
-    # - 1
     region.CreateFinish()
     print('+==+ ^\_/^ REGION COMPLETE')
     return region
-
-# +==+ ^\_/^ +==+ ^\_/^ +==+ 
-# Mesh:
-#   This module is very explicitly defining the mesh for OpenCMISS,
-#       it is possible to have these pre-generated within iron
-#       which leverages external packages like TetGen. In the below
-#       determined Node and Element values are being prescribed.
-# +==+ ^\_/^ +==+ ^\_/^ +==+ 
-
-def mesh_setup(region, n_n, mesh_n, dim, e_n, basis, e_idx, e_np_map):
-    nodesList = iron.Nodes()
-    # + 1
-    nodesList.CreateStart(region, n_n)
-    # - 1
-    nodesList.CreateFinish()
-    mesh = iron.Mesh()
-    # + 2
-    mesh.CreateStart(mesh_n, region, dim)
-    mesh.NumberOfElementsSet(e_n)
-    mesh.NumberOfComponentsSet(1) # =~-~=~-~= ?
-    mesh_e = iron.MeshElements()
-    # + 3
-    mesh_e.CreateStart(mesh, 1, basis)
-    for i in range(e_n):
-        nodesList = list(
-            map(int,e_np_map[i][:])
-        )
-        mesh_e.NodesSet(e_idx[i], nodesList)
-    # - 3
-    mesh_e.CreateFinish()
-    # - 2
-    mesh.CreateFinish()
-    print('+==+ ^\_/^ MESH COMPLETE')
-    return mesh_e, mesh
 
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
 # Decomposition:
@@ -126,11 +86,9 @@ def mesh_setup(region, n_n, mesh_n, dim, e_n, basis, e_idx, e_np_map):
 def decomposition_setup(mesh, decomp_n):
     comp_nodes_n = iron.ComputationalNumberOfNodesGet()
     decomp = iron.Decomposition()
-    # + 1
     decomp.CreateStart(decomp_n, mesh)
     decomp.TypeSet(iron.DecompositionTypes.CALCULATED)
     decomp.NumberOfDomainsSet(comp_nodes_n)
-    # - 1
     decomp.CreateFinish()
     print('+==+ ^\_/^ DECOMPOSITION COMPLETE')
     return decomp
@@ -144,50 +102,16 @@ def decomposition_setup(mesh, decomp_n):
 #       so after creating the field we can then allocate them values. 
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
 
-def geometric_setup(geo_field_n, region, decomp, n_n, n_idx, n_xyz):
+def geometric_setup(geo_field_n, region, decomp, n_idx, n_xyz):
     geo_field = iron.Field()
-    # + 1
     geo_field.CreateStart(geo_field_n, region) 
-    geo_field.TypeSet(iron.FieldTypes.GEOMETRIC)
     geo_field.MeshDecompositionSet(decomp)
+    geo_field.TypeSet(iron.FieldTypes.GEOMETRIC)
     geo_field.VariableLabelSet(iron.FieldVariableTypes.U, "Geometry")
-    # - 1
+    geo_field.ComponentMeshComponentSet(iron.FieldVariableTypes.U,X,1)
+    geo_field.ComponentMeshComponentSet(iron.FieldVariableTypes.U,Y,1) 
+    geo_field.ComponentMeshComponentSet(iron.FieldVariableTypes.U,Z,1) 
     geo_field.CreateFinish()
-    # + 2
-    geo_field.ParameterSetUpdateStart(
-        iron.FieldVariableTypes.U, 
-        iron.FieldParameterSetTypes.VALUES
-    )
-    for idx in range(n_n):
-        n_id = n_idx[idx]
-        n_x, n_y, n_z = (n_xyz[idx][0], n_xyz[idx][1], n_xyz[idx][2])
-        # iron.Field.ParameterSetUpdateNodeDP(
-        #     iron.FieldVariableTypes.U,            VARIABLE (here, displacement)
-        #     iron.FieldParameterSetTypes.VALUES,   TYPE OF FIELD FOR UPDATE
-        #     1,                                    VERSION OF DERIVATIVE
-        #     1,                                    DERIVATIVE NUMBER
-        #     n_id,                                 NODE IDENTIFIER
-        #     1,                                    COMPONENT OF NODE (here, X)
-        #     n_x                                   VALUE TO UPDATE TO
-        # )
-        geo_field.ParameterSetUpdateNodeDP(
-            iron.FieldVariableTypes.U, 
-            iron.FieldParameterSetTypes.VALUES,
-            1, 1, n_id, X, n_x
-        )
-        geo_field.ParameterSetUpdateNodeDP(
-            iron.FieldVariableTypes.U, 
-            iron.FieldParameterSetTypes.VALUES,
-            1, 1, n_id, Y, n_y
-        )
-        geo_field.ParameterSetUpdateNodeDP(
-            iron.FieldVariableTypes.U, 
-            iron.FieldParameterSetTypes.VALUES,
-            1, 1, n_id, Z, n_z
-        )
-    # - 2
-    geo_field.ParameterSetUpdateFinish(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES)
-    print('+==+ ^\_/^ GEOMETRIC FIELD COMPLETE')
     return geo_field
 
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
@@ -203,7 +127,6 @@ def geometric_setup(geo_field_n, region, decomp, n_n, n_idx, n_xyz):
 
 def material_setup(mat_field_n, decomp, geo_field, region, c):
     mat_field = iron.Field()
-    # + 1
     mat_field.CreateStart(mat_field_n, region)
     mat_field.TypeSet(iron.FieldTypes.MATERIAL)
     mat_field.MeshDecompositionSet(decomp)
@@ -218,7 +141,6 @@ def material_setup(mat_field_n, decomp, geo_field, region, c):
         iron.FieldVariableTypes.U, 2,
         iron.FieldInterpolationTypes.ELEMENT_BASED
     )
-    # - 1
     mat_field.CreateFinish()
     mat_field.ComponentValuesInitialiseDP(
         iron.FieldVariableTypes.U, 
@@ -245,7 +167,6 @@ def material_setup(mat_field_n, decomp, geo_field, region, c):
 
 def dependent_setup(dep_field_n, region, decomp, geo_field):
     dep_field = iron.Field()
-    # + 1
     dep_field.CreateStart(dep_field_n, region)
     dep_field.MeshDecompositionSet(decomp)
     dep_field.TypeSet(iron.FieldTypes.GEOMETRIC_GENERAL)
@@ -263,7 +184,6 @@ def dependent_setup(dep_field_n, region, decomp, geo_field):
         iron.FieldVariableTypes.DELUDELN, 4,
         iron.FieldInterpolationTypes.ELEMENT_BASED
     )
-    # - 1
     dep_field.CreateFinish()
     iron.Field.ParametersToFieldParametersComponentCopy(
         geo_field, iron.FieldVariableTypes.U, 
@@ -301,38 +221,14 @@ def dependent_setup(dep_field_n, region, decomp, geo_field):
 #       fields and define output and sparsity types for solving.
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
 
-def equations_setup(eqs_field_n, eqs_set_n, region, geo_field, dep_field_n, dep_field, mat_field_n, mat_field):
-    eqs_set_field = iron.Field()
-    eqs_set = iron.EquationsSet()
-    eqs_set_specs = [
-        iron.ProblemClasses.ELASTICITY,
-        iron.ProblemTypes.FINITE_ELASTICITY,
-        iron.EquationsSetSubtypes.MOONEY_RIVLIN
-    ]
-    # + 1
-    eqs_set.CreateStart(
-        eqs_set_n, region, geo_field, 
-        eqs_set_specs, eqs_field_n, eqs_set_field
-    )
-    # + 2
-    eqs_set.DependentCreateStart(dep_field_n, dep_field)
-    # - 2
-    eqs_set.DependentCreateFinish()
-    # + 3
-    eqs_set.MaterialsCreateStart(mat_field_n, mat_field)
-    # - 3
-    eqs_set.MaterialsCreateFinish()
-    # - 1
-    eqs_set.CreateFinish()
+def equations_setup(eqs_set):
     eqs = iron.Equations()
-    # + 4
     eqs_set.EquationsCreateStart(eqs)
     eqs.SparsityTypeSet(iron.EquationsSparsityTypes.SPARSE)
     eqs.OutputTypeSet(iron.EquationsOutputTypes.NONE)
-    # - 4
     eqs_set.EquationsCreateFinish()
     print('+==+ ^\_/^ EQUATIONS FIELD COMPLETE')
-    return eqs_set_field, eqs_set, eqs
+    return 
 
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
 # Problem Solver:
@@ -348,11 +244,8 @@ def problem_solver_setup(problem_n, eqs_set, loadsteps):
             iron.ProblemSubtypes.NONE
         ]
     )
-    # + 1
     problem.CreateStart(problem_n, problems_specs)
-    # - 1
     problem.CreateFinish()
-    # + 2
     problem.ControlLoopCreateStart()
     ctrl_loop = iron.ControlLoop()
     problem.ControlLoopGet(
@@ -360,12 +253,10 @@ def problem_solver_setup(problem_n, eqs_set, loadsteps):
         ctrl_loop
     )
     ctrl_loop.MaximumIterationsSet(loadsteps)
-    # - 2
     problem.ControlLoopCreateFinish()
     print('+==+ ^\_/^ PROBLEM SETUP COMPLETE')
     non_solver = iron.Solver()
     lin_solver = iron.Solver()
-    # + 3
     problem.SolversCreateStart()
     problem.SolverGet(
         [iron.ControlLoopIdentifiers.NODE], 
@@ -378,12 +269,9 @@ def problem_solver_setup(problem_n, eqs_set, loadsteps):
     )
     non_solver.NewtonLinearSolverGet(lin_solver)
     lin_solver.LinearTypeSet(iron.LinearSolverTypes.DIRECT)
-    # - 3
     problem.SolversCreateFinish()
-    # 
     solver = iron.Solver()
     solver_eqs = iron.SolverEquations()
-    # + 4
     problem.SolverEquationsCreateStart()
     problem.SolverGet(
         [iron.ControlLoopIdentifiers.NODE], 
@@ -392,7 +280,6 @@ def problem_solver_setup(problem_n, eqs_set, loadsteps):
     solver.SolverEquationsGet(solver_eqs)
     solver_eqs.SparsityTypeSet(iron.SolverEquationsSparsityTypes.SPARSE)
     _ = solver_eqs.EquationsSetAdd(eqs_set)
-    # - 4
     problem.SolverEquationsCreateFinish()
     print('+==+ ^\_/^ SOLVER SETUP COMPLETE')
     return problem, solver, solver_eqs

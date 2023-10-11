@@ -75,44 +75,104 @@ def elems(test_name):
 def main(test_name):
 
     # +============+  
-    # Node and Element infrastructure
-    # +============+ 
-
-    n_np_xyz, n_idx, n_n = nodes(test_name)
-    e_np_map, e_idx, e_n = elems(test_name)
-
-    # +============+  
     # Base infrastructure
     # +============+  
    
     cmfe_coord = cmfe.coordinate_setup(coord_n, DIM)
     cmfe_basis = cmfe.basis_setup(basis_n, XI_N)
     cmfe_region = cmfe.region_setup(region_n, cmfe_coord)
-    _, cmfe_mesh = cmfe.mesh_setup(
-        cmfe_region, n_n, mesh_n, DIM, 
-        e_n, cmfe_basis, e_idx, e_np_map
-    )
+
+    # +============+  
+    # Nodes and Element infrastructure
+    # +============+
+
+    n_np_xyz, n_idx, n_n = nodes(test_name)
+    e_np_map, e_idx, e_n = elems(test_name)
+
+    # +============+
+    # Mesh infrastructure
+    # +============+ 
+
+    cmfe_node = iron.Nodes()
+    cmfe_mesh = iron.Mesh()
+    cmfe_node.CreateStart(cmfe_region, n_n)
+    cmfe_node.CreateFinish()
+    cmfe_mesh.CreateStart(mesh_n, cmfe_region, DIM)
+    cmfe_mesh.NumberOfElementsSet(e_n)
+    cmfe_mesh.NumberOfComponentsSet(1) 
+    cmfe_mesh_e = iron.MeshElements()
+    cmfe_mesh_e.CreateStart(cmfe_mesh, 1, cmfe_basis)
+    for i in range(e_n):
+        nodesList = list(
+            map(int,e_np_map[i][:])
+        )
+        cmfe_mesh_e.NodesSet(e_idx[i], nodesList)
+    cmfe_mesh_e.CreateFinish()
+    cmfe_mesh.CreateFinish()
+    print('+==+ ^\_/^ MESH COMPLETE')
+    
+    # +============+  
+    # Decomposition and Geometry infrastructure
+    # +============+  
+
     cmfe_decomp = cmfe.decomposition_setup(cmfe_mesh, decomp_n)
+    cmfe_geo_field = cmfe.geometric_setup(geo_field_n, cmfe_region, cmfe_decomp, n_idx, n_np_xyz)
+    comp_nodes_n = iron.ComputationalNumberOfNodesGet()
+    for idx in n_idx:
+        cmfe_geo_field.ParameterSetUpdateNodeDP(
+            iron.FieldVariableTypes.U, 
+            iron.FieldParameterSetTypes.VALUES,
+            1, 1, idx, X, n_np_xyz[idx - 1, 0]
+        )
+        cmfe_geo_field.ParameterSetUpdateNodeDP(
+            iron.FieldVariableTypes.U, 
+            iron.FieldParameterSetTypes.VALUES,
+            1, 1, idx, Y, n_np_xyz[idx - 1, 1]
+        )
+        cmfe_geo_field.ParameterSetUpdateNodeDP(
+            iron.FieldVariableTypes.U, 
+            iron.FieldParameterSetTypes.VALUES,
+            1, 1, idx, Z, n_np_xyz[idx - 1, 2]
+        )
+    cmfe_geo_field.ParameterSetUpdateStart(iron.FieldVariableTypes.U, iron.FieldParameterSetTypes.VALUES)
+    cmfe_geo_field.ParameterSetUpdateFinish(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES)
+    print('+==+ ^\_/^ GEOMETRIC FIELD COMPLETE')
 
     # +============+  
-    # Field and Equation infrastructure
+    # Material and Dependent infrastructure
     # +============+  
 
-    cmfe_geo_field = cmfe.geometric_setup(geo_field_n, cmfe_region, cmfe_decomp, n_n, n_idx, n_np_xyz)
     cmfe_mat_field = cmfe.material_setup(mat_field_n, cmfe_decomp, cmfe_geo_field, cmfe_region, C_VALS)
     cmfe_dep_field = cmfe.dependent_setup(dep_field_n, cmfe_region, cmfe_decomp, cmfe_geo_field)
-    _, cmfe_eqs_set, _ = cmfe.equations_setup(
-        eqs_field_n, eqs_set_n, cmfe_region, 
-        cmfe_geo_field, dep_field_n, cmfe_dep_field, 
-        mat_field_n, cmfe_mat_field
+
+    # +============+  
+    # Equation infrastructure
+    # +============+ 
+
+    cmfe_eqs_set_field = iron.Field()
+    cmfe_eqs_set = iron.EquationsSet()
+    cmfe_eqs_set_specs = [
+        iron.ProblemClasses.ELASTICITY,
+        iron.ProblemTypes.FINITE_ELASTICITY,
+        iron.EquationsSetSubtypes.MOONEY_RIVLIN
+    ]
+    cmfe_eqs_set.CreateStart(
+        eqs_set_n, cmfe_region, cmfe_geo_field, 
+        cmfe_eqs_set_specs, eqs_field_n, cmfe_eqs_set_field
     )
+    cmfe_eqs_set.CreateFinish()
+    cmfe_eqs_set.DependentCreateStart(dep_field_n, cmfe_dep_field)
+    cmfe_eqs_set.DependentCreateFinish()
+    cmfe_eqs_set.MaterialsCreateStart(mat_field_n, cmfe_mat_field)
+    cmfe_eqs_set.MaterialsCreateFinish()
+    cmfe.equations_setup(cmfe_eqs_set)
 
     # +============+ 
     # Problem and Solution infrastructure
     # +============+ 
     
-    cmfe_problem, _, cmfe_solver_eqs = cmfe.problem_solver_setup(problem_n, cmfe_eqs_set, LOADSTEPS)
-    _, _ = cmfe.boundary_conditions_setup(cmfe_solver_eqs, cmfe_dep_field, n_n, n_np_xyz)
+    cmfe_problem, cmfe_solver, cmfe_solver_eqs = cmfe.problem_solver_setup(problem_n, cmfe_eqs_set, LOADSTEPS)
+    cmfe_bcs, cmfe_solver_eqs = cmfe.boundary_conditions_setup(cmfe_solver_eqs, cmfe_dep_field, n_n, n_np_xyz)
 
     # +============+ 
     # Solve
