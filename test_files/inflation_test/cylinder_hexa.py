@@ -29,13 +29,14 @@ X, Y, Z = (1, 2, 3)
 PRESSURE_TEST = True
 LOADSTEPS = 10
 INNER_RAD = 0.375
+C_VALS = [2.0, 6.0]
 RUNTIME_PATH = "/home/jovyan/work/docker-iron/test_files/inflation_test/runtime_files/"
 
 # Unique user number identifiers
 (
     coord_n, basis_n, region_n, mesh_n, decomp_n,
     geo_field_n, dep_field_n, mat_field_n,
-    eqs_field_n, eqs_n, problem_n, def_field_n,
+    eqs_field_n, eqs_set_n, problem_n, def_field_n,
     pre_field_n
 ) = range(1, 14)
 
@@ -86,25 +87,29 @@ def main(test_name):
     cmfe_region = cmfe.region_setup(region_n, cmfe_coord)
     # Mesh (?)
     cmfe_mesh_elem, cmfe_mesh = cmfe.mesh_setup(
-        cmfe_region, 
-        n_n, 
-        mesh_n, 
-        DIM, 
-        e_n, 
-        cmfe_basis, 
-        e_idx, 
-        e_np_map
+        cmfe_region, n_n, mesh_n, DIM, 
+        e_n, cmfe_basis, e_idx, e_np_map
     )
     # Decomposition {CALCULATED}
     cmfe_decomp = cmfe.decomposition_setup(cmfe_mesh, decomp_n)
 
     # +==+ field infrastructure
+
     # Geometric Field Setup {VALUES}
     cmfe_geo_field = cmfe.geometric_setup(geo_field_n, cmfe_region, cmfe_decomp, n_n, n_idx, n_np_xyz)
-    mat_field = cmfe.material_setup(decomp, geo_field, region)
+    # Material Field {ELEMENT_BASED, VALUES}
+    cmfe_mat_field = cmfe.material_setup(mat_field_n, cmfe_decomp, cmfe_geo_field, cmfe_region, C_VALS)
+    # Dependent Field {GEOMETRIC_GENERAL, DEPENDENT, DELUDELN, ELEMENT_BASED & VALUES}
+    cmfe_dep_field = cmfe.dependent_setup(dep_field_n, cmfe_region, cmfe_decomp, cmfe_geo_field)
+    # Equation Field {ELASTICITY, FINITE_ELASTICITY, MOONEY_RIVLIN, SPARSE & NONE}
+    cmfe_eqs_set_field, cmfe_eqs_set, cmfe_eqs = cmfe.equations_setup(
+        eqs_field_n, eqs_set_n, cmfe_region, 
+        cmfe_geo_field, dep_field_n, cmfe_dep_field, 
+        mat_field_n, cmfe_mat_field
+    )
 
-    eqs_set_field, eqs_set = cmfe.equations_setup(region, geo_field, mat_field)
-    dep_field, geo_field, eqs_set, eqs = cmfe.dependent_setup(region, decomp, geo_field, eqs_set)
+    # +==+ solution infrastructure
+    
     problem, ctrl_loop = cmfe.problem_setup()
     problem, nl_solver, li_solver, solver, solver_eqs = cmfe.solver_setup(problem, eqs_set)
     bcs, solver_eqs = cmfe.boundary_conditions_setup(solver_eqs, dep_field, n_n, n_np_xyz)

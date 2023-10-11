@@ -11,7 +11,7 @@ from opencmiss.iron import iron
 DIM = 3
 N_N_EL = 27
 QUAD_ORDER = 4
-X, Y, Z = (1, 2, 3)
+X, Y, Z, P = (1, 2, 3, 4)
 PRESSURE_TEST = True
 LOADSTEPS = 10
 INNER_RAD = 0.375
@@ -142,6 +142,7 @@ def geometric_setup(geo_field_n, region, decomp, n_n, n_idx, n_xyz):
     geo_field = iron.Field()
     # + 1
     geo_field.CreateStart(geo_field_n, region) 
+    geo_field.TypeSet(iron.FieldTypes.GEOMETRIC)
     geo_field.MeshDecompositionSet(decomp)
     geo_field.VariableLabelSet(iron.FieldVariableTypes.U, "Geometry")
     # - 1
@@ -166,189 +167,166 @@ def geometric_setup(geo_field_n, region, decomp, n_n, n_idx, n_xyz):
         geo_field.ParameterSetUpdateNodeDP(
             iron.FieldVariableTypes.U, 
             iron.FieldParameterSetTypes.VALUES,
-            1, 
-            1, 
-            n_id, 
-            1, 
-            n_x
+            1, 1, n_id, X, n_x
         )
         geo_field.ParameterSetUpdateNodeDP(
             iron.FieldVariableTypes.U, 
             iron.FieldParameterSetTypes.VALUES,
-            1, 
-            1, 
-            n_id, 
-            2, 
-            n_y
+            1, 1, n_id, Y, n_y
         )
         geo_field.ParameterSetUpdateNodeDP(
             iron.FieldVariableTypes.U, 
             iron.FieldParameterSetTypes.VALUES,
-            1, 
-            1, 
-            n_id, 
-            3, 
-            n_z
+            1, 1, n_id, Z, n_z
         )
     # - 2
     geo_field.ParameterSetUpdateFinish(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES)
-    
     return geo_field
 
-def material_setup(decomp, geo_field, region):
+# +==+ ^\_/^ +==+ ^\_/^ +==+ 
+# Material Field:
+#   The next field is the material field. This field allows
+#       us to dictate the constitutive properties of the 
+#       material being tested. Here we intend to use a Mooney-Rivlin
+#       material so this requires two constitutive components c1 and c2.
+#       Here we tell the componenets to be ELEMENT_BASED which indicates
+#       that the parameters can be different between elements but not
+#       between nodes. 
+# +==+ ^\_/^ +==+ ^\_/^ +==+ 
+
+def material_setup(mat_field_n, decomp, geo_field, region, c):
     mat_field = iron.Field()
+    # + 1
     mat_field.CreateStart(mat_field_n, region)
     mat_field.TypeSet(iron.FieldTypes.MATERIAL)
     mat_field.MeshDecompositionSet(decomp)
     mat_field.GeometricFieldSet(geo_field)
     mat_field.VariableLabelSet(iron.FieldVariableTypes.U, "Material")
     mat_field.NumberOfComponentsSet(iron.FieldVariableTypes.U, 2)
-    mat_field.ScalingTypeSet(iron.FieldScalingTypes.ARITHMETIC_MEAN)
-    # Loop through components
-    for component in [1, 2]:
-        mat_field.ComponentInterpolationSet(
-        iron.FieldVariableTypes.U, component,
-        iron.FieldInterpolationTypes.ELEMENT_BASED)
+    mat_field.ComponentInterpolationSet(
+        iron.FieldVariableTypes.U, 1,
+        iron.FieldInterpolationTypes.ELEMENT_BASED
+    )
+    mat_field.ComponentInterpolationSet(
+        iron.FieldVariableTypes.U, 2,
+        iron.FieldInterpolationTypes.ELEMENT_BASED
+    )
+    # - 1
     mat_field.CreateFinish()
     mat_field.ComponentValuesInitialiseDP(
         iron.FieldVariableTypes.U, 
         iron.FieldParameterSetTypes.VALUES, 
-        1, 
-        2.0
+        1, c[0]
     )
     mat_field.ComponentValuesInitialiseDP(
         iron.FieldVariableTypes.U, 
         iron.FieldParameterSetTypes.VALUES, 
-        2, 
-        6.0
+        2, c[1]
     )
-
     return mat_field
 
-def equations_setup(region, geo_field, mat_field):
+# +==+ ^\_/^ +==+ ^\_/^ +==+ 
+# Dependent Field:
+#   To hold the values of our nodes after deformation we require a 
+#       dependent field. To intialise this before solving we first
+#       set the values to be that of the undeformed geometry from
+#       the geometric field. And add a fourth component which is 
+#       indicating the hydrostatic pressure. Here, we denote 
+#       ELEMENT_BASED for pressure, meaning it is per element. 
+# +==+ ^\_/^ +==+ ^\_/^ +==+ 
+
+def dependent_setup(dep_field_n, region, decomp, geo_field):
+    dep_field = iron.Field()
+    # + 1
+    dep_field.CreateStart(dep_field_n, region)
+    dep_field.MeshDecompositionSet(decomp)
+    dep_field.TypeSet(iron.FieldTypes.GEOMETRIC_GENERAL)
+    dep_field.GeometricFieldSet(geo_field)
+    dep_field.DependentTypeSet(iron.FieldDependentTypes.DEPENDENT)
+    dep_field.VariableLabelSet(iron.FieldVariableTypes.U, "Dependent")
+    dep_field.NumberOfComponentsSet(iron.FieldVariableTypes.U, 4)
+    dep_field.NumberOfComponentsSet(iron.FieldVariableTypes.DELUDELN, 4)  
+    dep_field.ComponentInterpolationSet(
+        iron.FieldVariableTypes.U, 4,
+        iron.FieldInterpolationTypes.ELEMENT_BASED
+    )
+    dep_field.ComponentInterpolationSet(
+        iron.FieldVariableTypes.DELUDELN, 4,
+        iron.FieldInterpolationTypes.ELEMENT_BASED
+    )
+    # - 1
+    dep_field.CreateFinish()
+    iron.Field.ParametersToFieldParametersComponentCopy(
+        geo_field, iron.FieldVariableTypes.U, 
+        iron.FieldParameterSetTypes.VALUES, X,
+        dep_field, iron.FieldVariableTypes.U, 
+        iron.FieldParameterSetTypes.VALUES, X
+    )
+    iron.Field.ParametersToFieldParametersComponentCopy(
+        geo_field, iron.FieldVariableTypes.U, 
+        iron.FieldParameterSetTypes.VALUES, Y,
+        dep_field, iron.FieldVariableTypes.U, 
+        iron.FieldParameterSetTypes.VALUES, Y
+    )
+    iron.Field.ParametersToFieldParametersComponentCopy(
+        geo_field, iron.FieldVariableTypes.U, 
+        iron.FieldParameterSetTypes.VALUES, Z,
+        dep_field, iron.FieldVariableTypes.U, 
+        iron.FieldParameterSetTypes.VALUES, Z
+    )
+    iron.Field.ComponentValuesInitialiseDP(
+        dep_field, iron.FieldVariableTypes.U, 
+        iron.FieldParameterSetTypes.VALUES, P, 0.0
+    )
+    return dep_field
+
+# +==+ ^\_/^ +==+ ^\_/^ +==+ 
+# Equations Field:
+#    This field allows us to indicate what type of equations are used 
+#       to solve the problem set. ELASTICITY indicates that the geometry
+#       is being tested for an elastic case; FINITE_ELASTICITY is the 
+#       the type of the FEM equation being solved. We then classify the 
+#       constitutive equation for the material properties defined
+#       earlier, MOONEY_RIVLIN. We can then explicitly link the other
+#       fields and define output and sparsity types for solving.
+# +==+ ^\_/^ +==+ ^\_/^ +==+ 
+
+def equations_setup(eqs_field_n, eqs_set_n, region, geo_field, dep_field_n, dep_field, mat_field_n, mat_field):
     eqs_set_field = iron.Field()
     eqs_set = iron.EquationsSet()
-    #
     eqs_set_specs = [
         iron.ProblemClasses.ELASTICITY,
         iron.ProblemTypes.FINITE_ELASTICITY,
         iron.EquationsSetSubtypes.MOONEY_RIVLIN
     ]
-    #
+    # + 1
     eqs_set.CreateStart(
-        eqs_n, 
-        region, 
-        geo_field, 
-        eqs_set_specs,
-        eqs_field_n, 
-        eqs_set_field
+        eqs_set_n, region, geo_field, 
+        eqs_set_specs, eqs_field_n, eqs_set_field
     )
-
-    eqs_set.MaterialsCreateStart(mat_field_n, mat_field)
-    eqs_set.MaterialsCreateFinish()
-    eqs_set.CreateFinish()
-
-    return eqs_set_field, eqs_set
-
-def dependent_setup(region, decomp, geo_field, eqs_set):
-    dep_field = iron.Field()
+    # + 2
     eqs_set.DependentCreateStart(dep_field_n, dep_field)
-    dep_field.VariableLabelSet(iron.FieldVariableTypes.U, "Dependent")
-
-    for i in [1, 2, 3]:
-        dep_field.ComponentMeshComponentSet(iron.FieldVariableTypes.U, i, 1)
-        dep_field.ComponentMeshComponentSet(iron.FieldVariableTypes.DELUDELN, i, 1)
-    dep_field.ComponentMeshComponentSet(iron.FieldVariableTypes.U, 4, 1)
-    dep_field.ComponentMeshComponentSet(iron.FieldVariableTypes.DELUDELN, 4, 1)
-
-    dep_field.ComponentInterpolationSet(iron.FieldVariableTypes.U, 4,
-                                                iron.FieldInterpolationTypes.NODE_BASED)
-    dep_field.ComponentInterpolationSet(iron.FieldVariableTypes.DELUDELN, 4,
-                                                iron.FieldInterpolationTypes.NODE_BASED)
-    dep_field.ScalingTypeSet(iron.FieldScalingTypes.ARITHMETIC_MEAN)
-
+    # - 2
     eqs_set.DependentCreateFinish()
-
-    for i in [1, 2, 3]:
-        iron.Field.ParametersToFieldParametersComponentCopy(geo_field, iron.FieldVariableTypes.U,
-                                                             iron.FieldParameterSetTypes.VALUES, i, dep_field,
-                                                             iron.FieldVariableTypes.U,
-                                                             iron.FieldParameterSetTypes.VALUES, i)
-
-    # Set hydrostatic pressure initial guess.
-    dep_field.ComponentValuesInitialise(iron.FieldVariableTypes.U, iron.FieldParameterSetTypes.VALUES, 4,
-                                             0.0)
-
-    dep_field.ParameterSetUpdateStart(iron.FieldVariableTypes.U, iron.FieldParameterSetTypes.VALUES)
-    dep_field.ParameterSetUpdateFinish(iron.FieldVariableTypes.U, iron.FieldParameterSetTypes.VALUES)
-    
-    # if PRESSURE_TEST:
-    #     dep_field.ComponentInterpolationSet(
-    #         iron.FieldVariableTypes.U, 4, iron.FieldInterpolationTypes.GAUSS_POINT_BASED) # CHECK
-    #     dep_field.ComponentMeshComponentSet(
-    #         iron.FieldVariableTypes.U, 4, 1)
-    #     # DELUDELN variable (forces)
-    #     dep_field.ComponentInterpolationSet(
-    #         iron.FieldVariableTypes.DELUDELN, 4,
-    #         iron.FieldInterpolationTypes.NODE_BASED)
-    #     dep_field.ComponentMeshComponentSet(
-    #         iron.FieldVariableTypes.DELUDELN, 4, 1)
-    # else:
-    #     # Set the hydrostatic pressure to be constant within each element.
-    #     dep_field.ComponentInterpolationSet(
-    #         iron.FieldVariableTypes.U, 4,
-    #         iron.FieldInterpolationTypes.ELEMENT_BASED)
-    #     dep_field.ComponentInterpolationSet(
-    #         iron.FieldVariableTypes.DELUDELN, 4,
-    #         iron.FieldInterpolationTypes.ELEMENT_BASED)
-    # # dep_field.CreateFinish()
-    # eqs_set.DependentCreateFinish()
-    # #
-    # iron.Field.ParametersToFieldParametersComponentCopy(
-    #     geo_field,
-    #     iron.FieldVariableTypes.U, 
-    #     iron.FieldParameterSetTypes.VALUES, 
-    #     1,
-    #     dep_field, 
-    #     iron.FieldVariableTypes.U, 
-    #     iron.FieldParameterSetTypes.VALUES, 
-    #     1
-    # ) 
-    # iron.Field.ParametersToFieldParametersComponentCopy(
-    #     geo_field, 
-    #     iron.FieldVariableTypes.U, 
-    #     iron.FieldParameterSetTypes.VALUES, 
-    #     2,
-    #     dep_field, 
-    #     iron.FieldVariableTypes.U, 
-    #     iron.FieldParameterSetTypes.VALUES, 
-    #     2
-    # ) 
-    # iron.Field.ParametersToFieldParametersComponentCopy(
-    #     geo_field, 
-    #     iron.FieldVariableTypes.U, 
-    #     iron.FieldParameterSetTypes.VALUES, 
-    #     3, 
-    #     dep_field, 
-    #     iron.FieldVariableTypes.U, 
-    #     iron.FieldParameterSetTypes.VALUES, 
-    #     3
-    # ) 
-    # iron.Field.ComponentValuesInitialiseDP(
-    #     dep_field, 
-    #     iron.FieldVariableTypes.U, 
-    #     iron.FieldParameterSetTypes.VALUES, 
-    #     4, 
-    #     0.0
-    # ) 
-
+    # + 3
+    eqs_set.MaterialsCreateStart(mat_field_n, mat_field)
+    # - 3
+    eqs_set.MaterialsCreateFinish()
+    # - 1
+    eqs_set.CreateFinish()
     eqs = iron.Equations()
+    # + 4
     eqs_set.EquationsCreateStart(eqs)
     eqs.SparsityTypeSet(iron.EquationsSparsityTypes.SPARSE)
     eqs.OutputTypeSet(iron.EquationsOutputTypes.NONE)
+    # - 4
     eqs_set.EquationsCreateFinish()
+    return eqs_set_field, eqs_set, eqs
 
-    return dep_field, geo_field, eqs, eqs_set
+# +==+ ^\_/^ +==+ ^\_/^ +==+ 
+# Problem Solver:
+#    
+# +==+ ^\_/^ +==+ ^\_/^ +==+ 
 
 def problem_setup():
     problem = iron.Problem()
