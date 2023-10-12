@@ -11,10 +11,8 @@ Output: vtk_files/cylinder_hexa.vtk
 """
 
 import numpy as np
-import meshio
 from opencmiss.iron import iron
 import cmfe
-import os
 
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
 # Parameter Setup
@@ -25,7 +23,7 @@ DIM = 3
 XI_N = 3
 N_N_EL = 27
 QUAD_ORDER = 4
-X, Y, Z = (1, 2, 3)
+X, Y, Z, P = (1, 2, 3, 4)
 PRESSURE_TEST = True
 LOADSTEPS = 10
 INNER_RAD = 0.375
@@ -53,8 +51,8 @@ def nodes(test_name):
             line = line.strip().split('\t')
             n_idx.append(int(line[0]))
             n_xyz.append(line[1:])
-
-    return np.array(n_xyz).astype(float), n_idx, i
+    n_np_xyz = np.array(n_xyz).astype(float)
+    return n_np_xyz, n_idx, i
 
 def elems(test_name):
     e_idx = []
@@ -65,8 +63,8 @@ def elems(test_name):
             line = line.strip().split('\t')
             e_idx.append(i)
             e_map.append(line[3:])
-
-    return np.array(e_map).astype(int), e_idx, i
+    e_np_map = np.array(e_map).astype(int)
+    return e_np_map, e_idx, i
 
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
 # Main function for safe operation of inflation test
@@ -114,28 +112,28 @@ def main(test_name):
     # +============+  
     # Decomposition and Geometry infrastructure
     # +============+  
-
+    
     cmfe_decomp = cmfe.decomposition_setup(cmfe_mesh, decomp_n)
     cmfe_geo_field = cmfe.geometric_setup(geo_field_n, cmfe_region, cmfe_decomp, n_idx, n_np_xyz)
     comp_nodes_n = iron.ComputationalNumberOfNodesGet()
-    for idx in n_idx:
+    for i, idx in enumerate(n_idx):
         cmfe_geo_field.ParameterSetUpdateNodeDP(
             iron.FieldVariableTypes.U, 
             iron.FieldParameterSetTypes.VALUES,
-            1, 1, idx, X, n_np_xyz[idx - 1, 0]
+            1, 1, idx, X, n_np_xyz[i, 0]
         )
         cmfe_geo_field.ParameterSetUpdateNodeDP(
             iron.FieldVariableTypes.U, 
             iron.FieldParameterSetTypes.VALUES,
-            1, 1, idx, Y, n_np_xyz[idx - 1, 1]
+            1, 1, idx, Y, n_np_xyz[i, 1]
         )
         cmfe_geo_field.ParameterSetUpdateNodeDP(
             iron.FieldVariableTypes.U, 
             iron.FieldParameterSetTypes.VALUES,
-            1, 1, idx, Z, n_np_xyz[idx - 1, 2]
+            1, 1, idx, Z, n_np_xyz[i, 2]
         )
     cmfe_geo_field.ParameterSetUpdateStart(iron.FieldVariableTypes.U, iron.FieldParameterSetTypes.VALUES)
-    cmfe_geo_field.ParameterSetUpdateFinish(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES)
+    cmfe_geo_field.ParameterSetUpdateFinish(iron.FieldVariableTypes.U, iron.FieldParameterSetTypes.VALUES)
     print('+==+ ^\_/^ GEOMETRIC FIELD COMPLETE')
 
     # +============+  
@@ -172,7 +170,7 @@ def main(test_name):
     # +============+ 
     
     cmfe_problem, cmfe_solver, cmfe_solver_eqs = cmfe.problem_solver_setup(problem_n, cmfe_eqs_set, LOADSTEPS)
-    cmfe_bcs, cmfe_solver_eqs = cmfe.boundary_conditions_setup(cmfe_solver_eqs, cmfe_dep_field, n_n, n_np_xyz)
+    cmfe.boundary_conditions_setup(cmfe_solver_eqs, cmfe_dep_field, n_n, n_np_xyz)
 
     # +============+ 
     # Solve
@@ -184,10 +182,44 @@ def main(test_name):
         print("Failed")
 
     # +============+ 
-    # Export and Complete
+    # Deformed Fields and Export infrastructure
     # +============+ 
 
+    cmfe_def_field = cmfe.deformed_setup(def_field_n, cmfe_region, cmfe_decomp, cmfe_dep_field)
+    cmfe_pre_field = cmfe.pressure_setup(cmfe_region, cmfe_decomp, pre_field_n)
+    cmfe_dep_field.ParametersToFieldParametersComponentCopy(
+        iron.FieldVariableTypes.U,
+        iron.FieldParameterSetTypes.VALUES, X,
+        cmfe_def_field, iron.FieldVariableTypes.U,
+        iron.FieldParameterSetTypes.VALUES, X
+    )
+    cmfe_dep_field.ParametersToFieldParametersComponentCopy(
+        iron.FieldVariableTypes.U,
+        iron.FieldParameterSetTypes.VALUES, Y,
+        cmfe_def_field, iron.FieldVariableTypes.U,
+        iron.FieldParameterSetTypes.VALUES, Y
+    )
+    cmfe_dep_field.ParametersToFieldParametersComponentCopy(
+        iron.FieldVariableTypes.U,
+        iron.FieldParameterSetTypes.VALUES, Z,
+        cmfe_def_field, iron.FieldVariableTypes.U,
+        iron.FieldParameterSetTypes.VALUES, Z
+    )
+    cmfe_dep_field.ParametersToFieldParametersComponentCopy(
+        iron.FieldVariableTypes.U,
+        iron.FieldParameterSetTypes.VALUES,
+        P,
+        cmfe_pre_field, 
+        iron.FieldVariableTypes.U,
+        iron.FieldParameterSetTypes.VALUES, 
+        1
+    )
+    cmfe.vtk_output(cmfe_mesh, n_n, cmfe_geo_field, cmfe_dep_field, e_np_map, cmfe_mesh_e, RUNTIME_PATH)
+
+    # +============+ 
     # Wrap it up
+    # +============+ 
+
     cmfe_problem.Destroy()
     cmfe_coord.Destroy()
     cmfe_region.Destroy()
@@ -199,5 +231,5 @@ def main(test_name):
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
 
 if __name__ == '__main__':
-    test_name = "cylinder_hexa"
+    test_name = "cylinder_hexa_test"
     main(test_name)

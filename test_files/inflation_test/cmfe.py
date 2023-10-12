@@ -9,14 +9,7 @@ from opencmiss.iron import iron
 import meshio
 
 # Runtime required parameters
-DIM = 3
-N_N_EL = 27
-QUAD_ORDER = 4
 X, Y, Z, P = (1, 2, 3, 4)
-PRESSURE_TEST = True
-LOADSTEPS = 10
-INNER_RAD = 0.375
-RUNTIME_PATH = "/home/jovyan/work/docker-iron/test_files/inflation_test/runtime_files/"
 
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
 # Coordinate System:
@@ -288,17 +281,37 @@ def boundary_conditions_setup(solver_eqs, dep_field, n_n, n_np_xyz):
     bcs = iron.BoundaryConditions()
     solver_eqs.BoundaryConditionsCreateStart(bcs)
     for i in range(0, n_n, 1):
-        if (n_np_xyz[i, 2] == np.min(n_np_xyz[:, 2])) or (n_np_xyz[i, 2] == np.max(n_np_xyz[:, 2])):
-            bcs.AddNode(
-                dep_field, 
-                iron.FieldVariableTypes.U,
-                1,
-                1,
-                i+1,
-                Z,
-                iron.BoundaryConditionsTypes.FIXED,
-                0.0
-            )
+        # if (n_np_xyz[i, 2] == np.min(n_np_xyz[:, 2])) or (n_np_xyz[i, 2] == np.max(n_np_xyz[:, 2])):
+        bcs.AddNode(
+            dep_field, 
+            iron.FieldVariableTypes.U,
+            1,
+            1,
+            i+1,
+            Z,
+            iron.BoundaryConditionsTypes.FIXED,
+            0.0
+        )
+        bcs.AddNode(
+            dep_field, 
+            iron.FieldVariableTypes.U,
+            1,
+            1,
+            i+1,
+            Y,
+            iron.BoundaryConditionsTypes.FIXED,
+            0.0
+        )
+        bcs.AddNode(
+            dep_field, 
+            iron.FieldVariableTypes.U,
+            1,
+            1,
+            i+1,
+            X,
+            iron.BoundaryConditionsTypes.FIXED,
+            0.0
+        )
 
         # vecNorm = np.linalg.norm([n_np_xyz[i, 0], n_np_xyz[i, 1]])
         # if abs(vecNorm - INNER_RAD) < 1e-5:
@@ -334,20 +347,32 @@ def boundary_conditions_setup(solver_eqs, dep_field, n_n, n_np_xyz):
         #     )
     print('+==+ ^\_/^ BOUNDARY CONDITIONS COMPLETE')
     solver_eqs.BoundaryConditionsCreateFinish()
-    return bcs, solver_eqs
+    return 
 
-def output(region, decomp, dep_field, mesh, geo_field, n_n, e_n, mesh_e):
+# +==+ ^\_/^ +==+ ^\_/^ +==+ 
+# Deformed Field:
+#    
+# +==+ ^\_/^ +==+ ^\_/^ +==+ 
 
+def deformed_setup(def_field_n, region, decomp, dep_field):
     def_field = iron.Field()
     def_field.CreateStart(def_field_n, region)
     def_field.MeshDecompositionSet(decomp)
     def_field.TypeSet(iron.FieldTypes.GEOMETRIC)
     def_field.VariableLabelSet(iron.FieldVariableTypes.U, "DeformedGeometry")
-    for component in [1, 2, 3]:
-        def_field.ComponentMeshComponentSet(
-                iron.FieldVariableTypes.U, component, 1)
+    def_field.ComponentMeshComponentSet(iron.FieldVariableTypes.U, X, 1)
+    def_field.ComponentMeshComponentSet(iron.FieldVariableTypes.U, Y, 1)
+    def_field.ComponentMeshComponentSet(iron.FieldVariableTypes.U, Z, 1)
     def_field.CreateFinish()
+    print('+==+ ^\_/^ DEFORMED COMPLETE')
+    return dep_field
 
+# +==+ ^\_/^ +==+ ^\_/^ +==+ 
+# Pressure Field:
+#    
+# +==+ ^\_/^ +==+ ^\_/^ +==+ 
+
+def pressure_setup(region, decomp, pre_field_n):
     pre_field = iron.Field()
     pre_field.CreateStart(pre_field_n, region)
     pre_field.MeshDecompositionSet(decomp)
@@ -360,57 +385,40 @@ def output(region, decomp, dep_field, mesh, geo_field, n_n, e_n, mesh_e):
     )
     pre_field.NumberOfComponentsSet(iron.FieldVariableTypes.U, 1)
     pre_field.CreateFinish()
+    print('+==+ ^\_/^ PRESSURE COMPLETE')
+    return pre_field
 
-    for component in [1, 2, 3]:
-        dep_field.ParametersToFieldParametersComponentCopy(
-            iron.FieldVariableTypes.U,
-            iron.FieldParameterSetTypes.VALUES, component,
-            def_field, iron.FieldVariableTypes.U,
-            iron.FieldParameterSetTypes.VALUES, component)
+# +==+ ^\_/^ +==+ ^\_/^ +==+ 
+# Meshio VTK Output:
+#    
+# +==+ ^\_/^ +==+ ^\_/^ +==+ 
 
-    dep_field.ParametersToFieldParametersComponentCopy(
-        iron.FieldVariableTypes.U,
-        iron.FieldParameterSetTypes.VALUES,
-        4,
-        pre_field, 
-        iron.FieldVariableTypes.U,
-        iron.FieldParameterSetTypes.VALUES, 
-        1
-    )
-
+def vtk_output(mesh, n_n, geo_field, dep_field, e_np_map, mesh_e, runtime_path):
+    # +============+ 
+    # Store nodes Before & After deformation
+    # +============+ 
     meshNodes = iron.MeshNodes()
     mesh.NodesGet(1,meshNodes)
-
     n_list = []
     n_bef = []
     n_aft = []
-
     for i in range(0, n_n, 1):
         n_bef.append(
             [
                 geo_field.ParameterSetGetNodeDP(
                     iron.FieldVariableTypes.U,
                     iron.FieldParameterSetTypes.VALUES,
-                    1,
-                    1,
-                    i+1,
-                    1
+                    1, 1, i+1, X
                 ),
                 geo_field.ParameterSetGetNodeDP(
                     iron.FieldVariableTypes.U,
                     iron.FieldParameterSetTypes.VALUES,
-                    1,
-                    1,
-                    i+1,
-                    2
+                    1, 1, i+1, Y
                 ),
                 geo_field.ParameterSetGetNodeDP(
                     iron.FieldVariableTypes.U,
                     iron.FieldParameterSetTypes.VALUES,
-                    1,
-                    1,
-                    i+1,
-                    3
+                    1, 1, i+1, Z
                 )
             ]
         )
@@ -419,67 +427,52 @@ def output(region, decomp, dep_field, mesh, geo_field, n_n, e_n, mesh_e):
                 dep_field.ParameterSetGetNodeDP(
                     iron.FieldVariableTypes.U,
                     iron.FieldParameterSetTypes.VALUES,
-                    1,
-                    1,
-                    i+1,
-                    1
+                    1, 1, i+1, X
                 ),
                 dep_field.ParameterSetGetNodeDP(
                     iron.FieldVariableTypes.U,
                     iron.FieldParameterSetTypes.VALUES,
-                    1,
-                    1,
-                    i+1,
-                    2
+                    1, 1, i+1, Y
                 ),
                 dep_field.ParameterSetGetNodeDP(
                     iron.FieldVariableTypes.U,
                     iron.FieldParameterSetTypes.VALUES,
-                    1,
-                    1,
-                    i+1,
-                    3
+                    1, 1, i+1, Z
                 )
             ]
         )
         n_list.append(
             [
                 i+1, 
-                n_bef[i][0], 
-                n_bef[i][1],
-                n_bef[i][2], 
-                n_aft[i][0], 
-                n_aft[i][1], 
-                n_aft[i][2]
+                n_bef[i][0], n_bef[i][1], n_bef[i][2], 
+                n_aft[i][0], n_aft[i][1], n_aft[i][2]
             ]
         )
-
-    n_file = open('/home/jovyan/work/test_files/runtime_files/output_mesh.node', 'w')
-    n_file.writelines([str(line) + "\n" for line in n_list])
-    n_file.close()
-
-    e_list = []
-    for j in range(0, e_n, 1):
-        elem_n = mesh_e.NodesGet(1+j, 27)
-        e_list[j].append(elem_n)
-
-    elem_file=open('/home/jovyan/work/test_files/runtime_files/output_mesh.ele','w')
+    # +============+ 
+    # Store elements
+    # +============+ 
+    e_list = e_np_map
+    # +============+ 
+    # Store data files
+    # +============+
+    node_file = open(runtime_path + 'output_mesh.node', 'w')
+    node_file.writelines([str(line) + "\n" for line in n_list])
+    node_file.close()
+    elem_file=open(runtime_path + 'output_mesh.ele','w')
     elem_file.writelines([str(line) + "\n" for line in e_list])
     elem_file.close()
-
-    before_def = np.array(n_bef)
-    np.save('/home/jovyan/work/test_files/runtime_files/output_mesh_before_def.npy',before_def)
-    after_def = np.array(n_aft)
-    np.save('/home/jovyan/work/test_files/runtime_files/output_mesh_after_def.npy',after_def)
-
-    points = before_def
-    point_data = {"deformed": after_def}
-
-    cells_array = np.array(e_list)[:,:] - 1
-    cells = [("tetra10", cells_array)] + [("tetra10", cells_array)]
-
-    meshio.write_points_cells("/home/jovyan/work/test_files/runtime_files/output_mesh.vtk",points, cells, point_data)
-
-    meshio.write_points_cells("/home/jovyan/work/test_files/runtime_files/output_mesh_iron.vtk",points,cells, point_data)
+    bef_def = np.array(n_bef)
+    aft_def = np.array(n_aft)
+    np.save(runtime_path + 'output_mesh_before_def.npy',bef_def)
+    np.save(runtime_path + 'output_mesh_after_def.npy',aft_def)
+    # +============+ 
+    # VTK export
+    # +============+
+    meshio.write_points_cells(
+        runtime_path + "output_mesh.vtk", 
+        bef_def, 
+        [("hexahedron27", np.array(e_list)[:,:] - 1)] + [("hexahedron27", np.array(e_list)[:,:] - 1)], 
+        {"deformed": aft_def}
+    )
     print('+==+ ^\_/^ EXPORT COMPLETE')
     return
