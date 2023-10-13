@@ -11,6 +11,35 @@ import meshio
 # Runtime required parameters
 X, Y, Z, P = (1, 2, 3, 4)
 
+# Required Node Numbering:
+#         VTK            Gmsh
+#   *           top
+#   *  7--14--6     *  7--19--6
+#   *  |      |     *  |      |
+#   * 15  25  13    * 17  25  18
+#   *  |      |     *  |      |
+#   *  4--12--5     *  4--16--5
+#   *
+#   *           middle
+#   * 19--23--18    * 15--24--14
+#   *  |      |     *  |      |
+#   * 20  26  21    * 22  26  23
+#   *  |      |     *  |      |
+#   * 16--22--17    * 10--21--12
+#   *
+#   *           bottom
+#   *  3--10--2     *  3--13--2
+#   *  |      |     *  |      |
+#   * 11  24  9     *  9  20  11
+#   *  |      |     *  |      |
+#   *  0-- 8--1     *  0-- 8--1
+GMSH2VTK = [
+    0, 1, 2, 3, 4, 5, 6, 7,
+    8, 11, 13, 9, 16, 18, 19, 17,
+    10, 12, 14, 15, 22, 23, 21, 24,
+    20, 25, 26
+]
+
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
 # Coordinate System:
 #   Simply defines the coordinate system that is used for 
@@ -298,7 +327,7 @@ def boundary_conditions_setup(solver_eqs, dep_field, n_n, n_np_xyz):
             1,
             1,
             i+1,
-            Y,
+            X,
             iron.BoundaryConditionsTypes.FIXED,
             0.0
         )
@@ -308,13 +337,13 @@ def boundary_conditions_setup(solver_eqs, dep_field, n_n, n_np_xyz):
             1,
             1,
             i+1,
-            X,
+            Y,
             iron.BoundaryConditionsTypes.FIXED,
             0.0
         )
 
         # vecNorm = np.linalg.norm([n_np_xyz[i, 0], n_np_xyz[i, 1]])
-        # if abs(vecNorm - INNER_RAD) < 1e-5:
+        # if abs(vecNorm - 1) < 1e-5:
         #     bcs.AddNode(
         #         dep_field, 
         #         iron.FieldVariableTypes.U,
@@ -468,10 +497,12 @@ def vtk_output(mesh, n_n, geo_field, dep_field, e_np_map, mesh_e, runtime_path):
     # +============+ 
     # VTK export
     # +============+
+    e_list_gmsh = np.array(e_list)[:,:] - 1
+    e_list_vtk = e_list_gmsh[:, GMSH2VTK]
     meshio.write_points_cells(
         runtime_path + "output_mesh.vtk", 
         bef_def, 
-        [("hexahedron27", np.array(e_list)[:,:] - 1)] + [("hexahedron27", np.array(e_list)[:,:] - 1)], 
+        [("hexahedron27", e_list_vtk)] + [("hexahedron27", e_list_vtk)], 
         {"deformed": aft_def}
     )
     print('+==+ ^\_/^ EXPORT COMPLETE')
