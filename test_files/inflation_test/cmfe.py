@@ -306,74 +306,81 @@ def problem_solver_setup(problem_n, eqs_set, loadsteps):
     print('+==+ ^\_/^ SOLVER SETUP COMPLETE')
     return problem, solver, solver_eqs
 
-def boundary_conditions_setup(solver_eqs, dep_field, n_n, n_np_xyz):
+def boundary_conditions_setup(solver_eqs, dep_field, n_n, n_np_xyz, pre):
     bcs = iron.BoundaryConditions()
     solver_eqs.BoundaryConditionsCreateStart(bcs)
     for i in range(0, n_n, 1):
         # if (n_np_xyz[i, 2] == np.min(n_np_xyz[:, 2])) or (n_np_xyz[i, 2] == np.max(n_np_xyz[:, 2])):
+        #     bcs.AddNode(
+        #         dep_field, 
+        #         iron.FieldVariableTypes.U,
+        #         1, iron.GlobalDerivativeConstants.NO_GLOBAL_DERIV, i+1, Z,
+        #         iron.BoundaryConditionsTypes.FIXED,
+        #         0.0
+        #     )
+
         bcs.AddNode(
-            dep_field, 
-            iron.FieldVariableTypes.U,
-            1,
-            1,
-            i+1,
-            Z,
-            iron.BoundaryConditionsTypes.FIXED,
-            0.0
+                dep_field, 
+                iron.FieldVariableTypes.U,
+                1, 1, i+1, X,
+                iron.BoundaryConditionsTypes.FIXED,
+                0.0
         )
         bcs.AddNode(
-            dep_field, 
-            iron.FieldVariableTypes.U,
-            1,
-            1,
-            i+1,
-            X,
-            iron.BoundaryConditionsTypes.FIXED,
-            0.0
+                dep_field, 
+                iron.FieldVariableTypes.U,
+                1, 1, i+1, Y,
+                iron.BoundaryConditionsTypes.FIXED,
+                0.0
         )
         bcs.AddNode(
-            dep_field, 
-            iron.FieldVariableTypes.U,
-            1,
-            1,
-            i+1,
-            Y,
-            iron.BoundaryConditionsTypes.FIXED,
-            0.0
+                dep_field, 
+                iron.FieldVariableTypes.U,
+                1, 1, i+1, Y,
+                iron.BoundaryConditionsTypes.FIXED,
+                0.0
         )
+        if (n_np_xyz[i, 2] == np.min(n_np_xyz[:, 2])):
+            bcs.AddNode(
+                dep_field, 
+                iron.FieldVariableTypes.U,
+                1, 1, i+1, Z,
+                iron.BoundaryConditionsTypes.FIXED,
+                0.0
+            )
+
+        if (n_np_xyz[i, 2] == np.max(n_np_xyz[:, 2])):
+            bcs.AddNode(
+                dep_field, 
+                iron.FieldVariableTypes.U,
+                1, 1, i+1, Z,
+                iron.BoundaryConditionsTypes.FIXED,
+                0.05
+            )
 
         # vecNorm = np.linalg.norm([n_np_xyz[i, 0], n_np_xyz[i, 1]])
         # if abs(vecNorm - 1) < 1e-5:
-        #     bcs.AddNode(
-        #         dep_field, 
-        #         iron.FieldVariableTypes.U,
-        #         1,
-        #         1,
-        #         i,
-        #         X,
-        #         iron.BoundaryConditionsTypes.PRESSURE,
-        #         1.5
-        #     )
-        #     bcs.AddNode(
-        #         dep_field, 
-        #         iron.FieldVariableTypes.U,
-        #         1,
-        #         1,
-        #         i,
-        #         Y,
-        #         iron.BoundaryConditionsTypes.PRESSURE,
-        #         1.5
-        #     )
-        #     bcs.AddNode(
-        #         dep_field, 
-        #         iron.FieldVariableTypes.U,
-        #         1,
-        #         1,
-        #         i,
-        #         Z,
-        #         iron.BoundaryConditionsTypes.PRESSURE,
-        #         1.5
-        #     )
+            # bcs.AddNode(dep_field, 
+            #             iron.FieldVariableTypes.DELUDELN, 1,
+            #             iron.GlobalDerivativeConstants.NO_GLOBAL_DERIV, 
+            #             i+1, X,
+            #             iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED, 
+            #             pre
+            # )
+            # bcs.AddNode(dep_field, 
+            #             iron.FieldVariableTypes.DELUDELN, 1,
+            #             iron.GlobalDerivativeConstants.NO_GLOBAL_DERIV, 
+            #             i+1, Y,
+            #             iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED, 
+            #             pre
+            # )
+            # bcs.AddNode(dep_field, 
+            #             iron.FieldVariableTypes.DELUDELN, 1,
+            #             iron.GlobalDerivativeConstants.NO_GLOBAL_DERIV, 
+            #             i+1, Z,
+            #             iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED, 
+            #             pre
+            # )
     print('+==+ ^\_/^ BOUNDARY CONDITIONS COMPLETE')
     solver_eqs.BoundaryConditionsCreateFinish()
     return 

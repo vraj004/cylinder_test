@@ -166,20 +166,30 @@ def main(test_name):
     cmfe.equations_setup(cmfe_eqs_set)
 
     # +============+ 
-    # Problem and Solution infrastructure
-    # +============+ 
-    
-    cmfe_problem, cmfe_solver, cmfe_solver_eqs = cmfe.problem_solver_setup(problem_n, cmfe_eqs_set, LOADSTEPS)
-    cmfe.boundary_conditions_setup(cmfe_solver_eqs, cmfe_dep_field, n_n, n_np_xyz)
-
-    # +============+ 
     # Solve
     # +============+  
 
-    try:
-        cmfe_problem.Solve()
-    except:
-        print("Failed")
+    p = 0.0
+
+    for _ in range(0,1):
+        pre_inc = [1500/6] * 6
+        tolerances = [1e-5, 1e-5, 1e-5, 1e-5, 1e-5, 1e-5, 1e-5]
+        its = 10
+
+        for i in range(0, len(pre_inc)):
+            inc = pre_inc[i]
+            tol = tolerances[i]
+
+            # +============+ 
+            # Problem and Solution infrastructure
+            # +============+ 
+            
+            cmfe_problem, cmfe_solver, cmfe_solver_eqs = cmfe.problem_solver_setup(problem_n, cmfe_eqs_set, its)
+            cmfe.boundary_conditions_setup(cmfe_solver_eqs, cmfe_dep_field, n_n, n_np_xyz, inc)
+
+            cmfe_problem.Solve()
+            cmfe_problem.Finalise()
+            cmfe_solver_eqs.Finalise()
 
     # +============+ 
     # Deformed Fields and Export infrastructure
