@@ -12,7 +12,7 @@ Output: vtk_files/cylinder_hexa.vtk
 
 import numpy as np
 from opencmiss.iron import iron
-import cmfe
+import cmfe_LV as cmfe
 
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
 # Parameter Setup
@@ -76,9 +76,10 @@ def main(test_name):
     # Base infrastructure
     # +============+  
    
-    cmfe_coord = cmfe.coordinate_setup(coord_n, DIM)
+    cmfe_coord, cmfe_region = cmfe.coordinate_setup(coord_n, DIM)
+    comp_nodes_n = iron.ComputationalNumberOfNodesGet()
+    comp_node = iron.ComputationalNodeNumberGet()
     cmfe_basis = cmfe.basis_setup(basis_n, XI_N)
-    cmfe_region = cmfe.region_setup(region_n, cmfe_coord)
 
     # +============+  
     # Nodes and Element infrastructure
@@ -91,13 +92,15 @@ def main(test_name):
     # Mesh infrastructure
     # +============+ 
 
-    cmfe_node = iron.Nodes()
     cmfe_mesh = iron.Mesh()
+    cmfe_mesh.CreateStart(mesh_n, cmfe_region, DIM)
+    cmfe_mesh.NumberOfComponentsSet(1) 
+    cmfe_mesh.NumberOfElementsSet(e_n)
+
+    cmfe_node = iron.Nodes()
     cmfe_node.CreateStart(cmfe_region, n_n)
     cmfe_node.CreateFinish()
-    cmfe_mesh.CreateStart(mesh_n, cmfe_region, DIM)
-    cmfe_mesh.NumberOfElementsSet(e_n)
-    cmfe_mesh.NumberOfComponentsSet(1) 
+    
     cmfe_mesh_e = iron.MeshElements()
     cmfe_mesh_e.CreateStart(cmfe_mesh, 1, cmfe_basis)
     for i in range(e_n):
@@ -105,6 +108,7 @@ def main(test_name):
             map(int,e_np_map[i][:])
         )
         cmfe_mesh_e.NodesSet(e_idx[i], nodesList)
+
     cmfe_mesh_e.CreateFinish()
     cmfe_mesh.CreateFinish()
     print('+==+ ^\_/^ MESH COMPLETE')
@@ -113,9 +117,11 @@ def main(test_name):
     # Decomposition and Geometry infrastructure
     # +============+  
     
-    cmfe_decomp = cmfe.decomposition_setup(cmfe_mesh, decomp_n)
+    cmfe_decomp = cmfe.decomposition_setup(cmfe_mesh, decomp_n, comp_nodes_n)
+
     cmfe_geo_field = cmfe.geometric_setup(geo_field_n, cmfe_region, cmfe_decomp, n_idx, n_np_xyz)
-    comp_nodes_n = iron.ComputationalNumberOfNodesGet()
+    cmfe_geo_field.ParameterSetUpdateStart(iron.FieldVariableTypes.U, iron.FieldParameterSetTypes.VALUES)
+
     for i, idx in enumerate(n_idx):
         cmfe_geo_field.ParameterSetUpdateNodeDP(
             iron.FieldVariableTypes.U, 
@@ -132,7 +138,7 @@ def main(test_name):
             iron.FieldParameterSetTypes.VALUES,
             1, 1, idx, Z, n_np_xyz[i, 2]
         )
-    cmfe_geo_field.ParameterSetUpdateStart(iron.FieldVariableTypes.U, iron.FieldParameterSetTypes.VALUES)
+
     cmfe_geo_field.ParameterSetUpdateFinish(iron.FieldVariableTypes.U, iron.FieldParameterSetTypes.VALUES)
     print('+==+ ^\_/^ GEOMETRIC FIELD COMPLETE')
 
@@ -141,11 +147,6 @@ def main(test_name):
     # +============+  
 
     cmfe_mat_field = cmfe.material_setup(mat_field_n, cmfe_decomp, cmfe_geo_field, cmfe_region, C_VALS)
-    cmfe_dep_field = cmfe.dependent_setup(dep_field_n, cmfe_region, cmfe_decomp, cmfe_geo_field)
-
-    # +============+  
-    # Equation infrastructure
-    # +============+ 
 
     cmfe_eqs_set_field = iron.Field()
     cmfe_eqs_set = iron.EquationsSet()
@@ -159,10 +160,21 @@ def main(test_name):
         cmfe_eqs_set_specs, eqs_field_n, cmfe_eqs_set_field
     )
     cmfe_eqs_set.CreateFinish()
-    cmfe_eqs_set.DependentCreateStart(dep_field_n, cmfe_dep_field)
-    cmfe_eqs_set.DependentCreateFinish()
+
     cmfe_eqs_set.MaterialsCreateStart(mat_field_n, cmfe_mat_field)
     cmfe_eqs_set.MaterialsCreateFinish()
+
+
+    cmfe_dep_field = cmfe.dependent_setup(dep_field_n, cmfe_region, cmfe_decomp, cmfe_geo_field)
+    
+
+    # +============+  
+    # Equation infrastructure
+    # +============+ 
+    
+    cmfe_eqs_set.DependentCreateStart(dep_field_n, cmfe_dep_field)
+    cmfe_eqs_set.DependentCreateFinish()
+    
     cmfe.equations_setup(cmfe_eqs_set)
 
     # +============+ 

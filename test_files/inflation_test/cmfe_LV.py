@@ -45,14 +45,29 @@ GMSH2VTK = [
 #   Simply defines the coordinate system that is used for 
 #       solving the finite element problem (i.e. 3D).
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
+# +==+ ^\_/^ +==+ ^\_/^ +==+ 
+# Region: 
+#   The region is where a certain physics is occuring, we can always
+#       specify multiple regions to couple different operations and
+#       seperate them in our computations.
+# +==+ ^\_/^ +==+ ^\_/^ +==+ 
 
-def coordinate_setup(coord_n, dim):
+def coordinate_setup(coord_n, dim, region_n):
+
     coord_sys = iron.CoordinateSystem()
     coord_sys.CreateStart(coord_n)
     coord_sys.DimensionSet(dim)
     coord_sys.CreateFinish()
     print('+==+ ^\_/^ COORDINATES COMPLETE')
-    return coord_sys
+
+    region = iron.Region()
+    region.CreateStart(region_n, iron.WorldRegion)
+    region.CoordinateSystemSet(coord_sys)
+    region.LabelSet("Region")
+    region.CreateFinish()
+    print('+==+ ^\_/^ REGION COMPLETE')
+
+    return coord_sys, region
 
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
 # Basis:
@@ -78,21 +93,6 @@ def basis_setup(basis_n, xi_n):
     print('+==+ ^\_/^ BASIS COMPLETE')
     return basis
 
-# +==+ ^\_/^ +==+ ^\_/^ +==+ 
-# Region: 
-#   The region is where a certain physics is occuring, we can always
-#       specify multiple regions to couple different operations and
-#       seperate them in our computations.
-# +==+ ^\_/^ +==+ ^\_/^ +==+ 
-
-def region_setup(region_n, coord_sys):
-    region = iron.Region()
-    region.CreateStart(region_n, iron.WorldRegion)
-    region.CoordinateSystemSet(coord_sys)
-    region.LabelSet("Region")
-    region.CreateFinish()
-    print('+==+ ^\_/^ REGION COMPLETE')
-    return region
 
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
 # Decomposition:
@@ -105,14 +105,15 @@ def region_setup(region_n, coord_sys):
 #       a graph partitioning approach.
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
 
-def decomposition_setup(mesh, decomp_n):
-    comp_nodes_n = iron.ComputationalNumberOfNodesGet()
+def decomposition_setup(mesh, decomp_n, comp_nodes_n):
     decomp = iron.Decomposition()
     decomp.CreateStart(decomp_n, mesh)
-    decomp.TypeSet(iron.DecompositionTypes.CALCULATED)
+    decomp.type = iron.DecompositionTypes.CALCULATED
     decomp.NumberOfDomainsSet(comp_nodes_n)
+    decomp.CalculateFacesSet(True)
     decomp.CreateFinish()
     print('+==+ ^\_/^ DECOMPOSITION COMPLETE')
+
     return decomp
 
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
@@ -128,11 +129,8 @@ def geometric_setup(geo_field_n, region, decomp, n_idx, n_xyz):
     geo_field = iron.Field()
     geo_field.CreateStart(geo_field_n, region) 
     geo_field.MeshDecompositionSet(decomp)
-    geo_field.TypeSet(iron.FieldTypes.GEOMETRIC)
     geo_field.VariableLabelSet(iron.FieldVariableTypes.U, "Geometry")
-    geo_field.ComponentMeshComponentSet(iron.FieldVariableTypes.U,X,1)
-    geo_field.ComponentMeshComponentSet(iron.FieldVariableTypes.U,Y,1) 
-    geo_field.ComponentMeshComponentSet(iron.FieldVariableTypes.U,Z,1) 
+    geo_field.ScalingTypeSet(iron.FieldScalingTypes.UNIT)
     geo_field.CreateFinish()
     return geo_field
 
@@ -154,7 +152,9 @@ def material_setup(mat_field_n, decomp, geo_field, region, c):
     mat_field.MeshDecompositionSet(decomp)
     mat_field.GeometricFieldSet(geo_field)
     mat_field.VariableLabelSet(iron.FieldVariableTypes.U, "Material")
-    mat_field.NumberOfComponentsSet(iron.FieldVariableTypes.U, 2)
+    mat_field.NumberOfVariablesSet(1)
+    mat_field.NumberOfComponentsSet(iron.FieldVariableTypes.U, len(c))
+    mat_field.ScalingTypeSet(iron.FieldScalingTypes.ARITHMETIC_MEAN)
     mat_field.ComponentInterpolationSet(
         iron.FieldVariableTypes.U, 1,
         iron.FieldInterpolationTypes.ELEMENT_BASED
@@ -174,7 +174,11 @@ def material_setup(mat_field_n, decomp, geo_field, region, c):
         iron.FieldParameterSetTypes.VALUES, 
         2, c[1]
     )
+
+    mat_field.ParameterSetUpdateStart(iron.FieldVariableTypes.U, iron.FieldParameterSetTypes.VALUES)
+    mat_field.ParameterSetUpdateFinish(iron.FieldVariableTypes.U, iron.FieldParameterSetTypes.VALUES)
     print('+==+ ^\_/^ MATERIAL FIELD COMPLETE')
+    
     return mat_field
 
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
@@ -187,27 +191,23 @@ def material_setup(mat_field_n, decomp, geo_field, region, c):
 #       ELEMENT_BASED for pressure, meaning it is per element. 
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
 
-def dependent_setup(dep_field_n, region, decomp, geo_field):
+def dependent_setup(dep_field_n, eqs_set, region, decomp, geo_field):
     dep_field = iron.Field()
-    dep_field.CreateStart(dep_field_n, region)
-    dep_field.MeshDecompositionSet(decomp)
-    dep_field.TypeSet(iron.FieldTypes.GEOMETRIC_GENERAL)
-    dep_field.GeometricFieldSet(geo_field)
-    dep_field.DependentTypeSet(iron.FieldDependentTypes.DEPENDENT)
+    eqs_set.DependentCreateStart(dep_field_n, dep_field)
     dep_field.VariableLabelSet(iron.FieldVariableTypes.U, "Dependent")
-    dep_field.NumberOfVariablesSet(2)
-    dep_field.NumberOfComponentsSet(iron.FieldVariableTypes.U, 4)
-    dep_field.NumberOfComponentsSet(iron.FieldVariableTypes.DELUDELN, 4) 
-    # dep_field.ComponentMeshComponentSet(iron.FieldVariableTypes.U, 4, 2)
-    # dep_field.ComponentMeshComponentSet(iron.FieldVariableTypes.DELUDELN, 4, 2) 
-    dep_field.ComponentInterpolationSet(
-        iron.FieldVariableTypes.U, 4,
-        iron.FieldInterpolationTypes.NODE_BASED
-    )
-    dep_field.ComponentInterpolationSet(
-        iron.FieldVariableTypes.DELUDELN, 4,
-        iron.FieldInterpolationTypes.NODE_BASED
-    )
+    
+    for i in [1, 2, 3]:
+            dep_field.ComponentMeshComponentSet(iron.FieldVariableTypes.U, i, 1)
+            dep_field.ComponentMeshComponentSet(iron.FieldVariableTypes.DELUDELN, i, 1)
+    
+    dep_field.ComponentMeshComponentSet(iron.FieldVariableTypes.U, 4, 2)
+    dep_field.ComponentMeshComponentSet(iron.FieldVariableTypes.DELUDELN, 4, 2)
+
+    dep_field.ComponentInterpolationSet(iron.FieldVariableTypes.U, 4,
+                                                iron.FieldInterpolationTypes.NODE_BASED)
+    dep_field.ComponentInterpolationSet(iron.FieldVariableTypes.DELUDELN, 4,
+                                                iron.FieldInterpolationTypes.NODE_BASED)
+    
     dep_field.ScalingTypeSet(iron.FieldScalingTypes.UNIT)
     dep_field.CreateFinish()
     iron.Field.ParametersToFieldParametersComponentCopy(
