@@ -27,7 +27,7 @@ X, Y, Z, P = (1, 2, 3, 4)
 PRESSURE_TEST = True
 LOADSTEPS = 10
 INNER_RAD = 0.375
-C_VALS = [2.0, 6.0]
+C_VALS = [-2.0, 0]
 RUNTIME_PATH = "/home/jovyan/work/docker-iron/test_files/inflation_test/runtime_files/"
 
 # Unique user number identifiers
@@ -172,7 +172,7 @@ def main(test_name):
     p = 0.0
 
     for _ in range(0,1):
-        pre_inc = [-5] * 6
+        pre_inc = [0] * 1
         tolerances = [1e-5, 1e-5, 1e-5, 1e-5, 1e-5, 1e-5, 1e-5]
         its = 1
 
@@ -224,6 +224,11 @@ def main(test_name):
         iron.FieldParameterSetTypes.VALUES, 
         1
     )
+    fields = iron.Fields()
+    fields.CreateRegion(cmfe_region)
+    fields.NodesExport("Output", "FORTRAN")
+    fields.ElementsExport("Output", "FORTRAN")
+    fields.Finalise()
     cmfe.vtk_output(cmfe_mesh, n_n, cmfe_geo_field, cmfe_dep_field, e_np_map, cmfe_mesh_e, RUNTIME_PATH)
 
     # +============+ 

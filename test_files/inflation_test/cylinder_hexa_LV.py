@@ -172,7 +172,7 @@ def main(test_name):
     # Equation infrastructure
     # +============+ 
     
-    cmfe_eqs_set.DependentCreateStart(dep_field_n, cmfe_dep_field)
+    
     cmfe_eqs_set.DependentCreateFinish()
     
     cmfe.equations_setup(cmfe_eqs_set)

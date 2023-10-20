@@ -202,11 +202,11 @@ def dependent_setup(dep_field_n, region, decomp, geo_field):
     # dep_field.ComponentMeshComponentSet(iron.FieldVariableTypes.DELUDELN, 4, 2) 
     dep_field.ComponentInterpolationSet(
         iron.FieldVariableTypes.U, 4,
-        iron.FieldInterpolationTypes.NODE_BASED
+        iron.FieldInterpolationTypes.ELEMENT_BASED
     )
     dep_field.ComponentInterpolationSet(
         iron.FieldVariableTypes.DELUDELN, 4,
-        iron.FieldInterpolationTypes.NODE_BASED
+        iron.FieldInterpolationTypes.ELEMENT_BASED
     )
     dep_field.ScalingTypeSet(iron.FieldScalingTypes.UNIT)
     dep_field.CreateFinish()
