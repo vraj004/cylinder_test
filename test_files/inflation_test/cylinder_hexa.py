@@ -25,9 +25,9 @@ N_N_EL = 27
 QUAD_ORDER = 4
 X, Y, Z, P = (1, 2, 3, 4)
 PRESSURE_TEST = True
-LOADSTEPS = 10
+LOADSTEPS = 5
 INNER_RAD = 0.375
-C_VALS = [-2.0, 0]
+C_VALS = [1, 0.2]
 RUNTIME_PATH = "/home/jovyan/work/docker-iron/test_files/inflation_test/runtime_files/"
 
 # Unique user number identifiers
@@ -75,10 +75,16 @@ def main(test_name):
     # +============+  
     # Base infrastructure
     # +============+  
-   
+    
+    # +==+ cmfe coordainte system
     cmfe_coord = cmfe.coordinate_setup(coord_n, DIM)
+    print('+==+ COORDINATE SYSTEM COMPLETE')
+    # +==+ cmfe basis system
     cmfe_basis = cmfe.basis_setup(basis_n, XI_N)
+    print('+==+ BASIS SYSTEM COMPLETE')
+    # +==+ cmfe region system
     cmfe_region = cmfe.region_setup(region_n, cmfe_coord)
+    print('+==+ REGION COMPLETE')
 
     # +============+  
     # Nodes and Element infrastructure
@@ -91,130 +97,143 @@ def main(test_name):
     # Mesh infrastructure
     # +============+ 
 
+    # +==+ cmfe nodes
     cmfe_node = iron.Nodes()
-    cmfe_mesh = iron.Mesh()
     cmfe_node.CreateStart(cmfe_region, n_n)
     cmfe_node.CreateFinish()
+    # +==+ cmfe mesh
+    cmfe_mesh = iron.Mesh()
     cmfe_mesh.CreateStart(mesh_n, cmfe_region, DIM)
     cmfe_mesh.NumberOfElementsSet(e_n)
     cmfe_mesh.NumberOfComponentsSet(1) 
+    # +==+ cmfe mesh elements
     cmfe_mesh_e = iron.MeshElements()
     cmfe_mesh_e.CreateStart(cmfe_mesh, 1, cmfe_basis)
+    # += allocating nodes to elements
+    print('+= ... begin mesh allocation')
     for i in range(e_n):
         nodesList = list(
             map(int,e_np_map[i][:])
         )
         cmfe_mesh_e.NodesSet(e_idx[i], nodesList)
+    # +=
     cmfe_mesh_e.CreateFinish()
     cmfe_mesh.CreateFinish()
-    print('+==+ ^\_/^ MESH COMPLETE')
+    print('+==+ MESH ALLOCATION COMPLETE')
     
     # +============+  
     # Decomposition and Geometry infrastructure
     # +============+  
     
+    # +==+ cmfe decomposition field
     cmfe_decomp = cmfe.decomposition_setup(cmfe_mesh, decomp_n)
+    print('+==+ DECOMPOSITION FIELD COMPLETE')
+    # +==+ cmfe geometric field
     cmfe_geo_field = cmfe.geometric_setup(geo_field_n, cmfe_region, cmfe_decomp, n_idx, n_np_xyz)
-    comp_nodes_n = iron.ComputationalNumberOfNodesGet()
+    # += setup geometric field with undeformed coordiantes
+    print('+= ... begin undeformed mesh setup')
     for i, idx in enumerate(n_idx):
-        cmfe_geo_field.ParameterSetUpdateNodeDP(
-            iron.FieldVariableTypes.U, 
-            iron.FieldParameterSetTypes.VALUES,
-            1, 1, idx, X, n_np_xyz[i, 0]
-        )
-        cmfe_geo_field.ParameterSetUpdateNodeDP(
-            iron.FieldVariableTypes.U, 
-            iron.FieldParameterSetTypes.VALUES,
-            1, 1, idx, Y, n_np_xyz[i, 1]
-        )
-        cmfe_geo_field.ParameterSetUpdateNodeDP(
-            iron.FieldVariableTypes.U, 
-            iron.FieldParameterSetTypes.VALUES,
-            1, 1, idx, Z, n_np_xyz[i, 2]
-        )
+        for j in [X, Y, Z]:
+            cmfe_geo_field.ParameterSetUpdateNodeDP(
+                iron.FieldVariableTypes.U, 
+                iron.FieldParameterSetTypes.VALUES,
+                1, 1, idx, j, n_np_xyz[i, j-1]
+            )
+    # += 
     cmfe_geo_field.ParameterSetUpdateStart(iron.FieldVariableTypes.U, iron.FieldParameterSetTypes.VALUES)
     cmfe_geo_field.ParameterSetUpdateFinish(iron.FieldVariableTypes.U, iron.FieldParameterSetTypes.VALUES)
-    print('+==+ ^\_/^ GEOMETRIC FIELD COMPLETE')
+    print('+==+ GEOMETRIC FIELD COMPLETE')
 
     # +============+  
     # Material and Dependent infrastructure
     # +============+  
 
+    # +==+ cmfe material field
     cmfe_mat_field = cmfe.material_setup(mat_field_n, cmfe_decomp, cmfe_geo_field, cmfe_region, C_VALS)
+    print('+==+ MATERIAL FIELD COMPLETE')
+    # +==+ cmfe dependent field
     cmfe_dep_field = cmfe.dependent_setup(dep_field_n, cmfe_region, cmfe_decomp, cmfe_geo_field)
+    print('+==+ DEPENDENT FIELD COMPLETE')
 
     # +============+  
     # Equation infrastructure
     # +============+ 
 
+    # +==+ cmfe equation set field 
     cmfe_eqs_set_field = iron.Field()
-    cmfe_eqs_set = iron.EquationsSet()
     cmfe_eqs_set_specs = [
         iron.ProblemClasses.ELASTICITY,
         iron.ProblemTypes.FINITE_ELASTICITY,
         iron.EquationsSetSubtypes.MOONEY_RIVLIN
     ]
+    # +==+ cmfe equation set 
+    cmfe_eqs_set = iron.EquationsSet()
     cmfe_eqs_set.CreateStart(
-        eqs_set_n, cmfe_region, cmfe_geo_field, 
-        cmfe_eqs_set_specs, eqs_field_n, cmfe_eqs_set_field
+        eqs_set_n, cmfe_region, cmfe_geo_field, cmfe_eqs_set_specs, eqs_field_n, cmfe_eqs_set_field
     )
     cmfe_eqs_set.CreateFinish()
     cmfe_eqs_set.DependentCreateStart(dep_field_n, cmfe_dep_field)
     cmfe_eqs_set.DependentCreateFinish()
     cmfe_eqs_set.MaterialsCreateStart(mat_field_n, cmfe_mat_field)
     cmfe_eqs_set.MaterialsCreateFinish()
+    # +==+ cmfe equations
     cmfe.equations_setup(cmfe_eqs_set)
+    print('+==+ EQUATION FIELD COMPLETE')
 
     # +============+ 
     # Solve
     # +============+  
 
-    p = 0.0
+    # +==+ Export field information so far
+    fields = iron.Fields()
+    fields.CreateRegion(cmfe_region)
+    fields.NodesExport("Output", "FORTRAN")
+    fields.ElementsExport("Output", "FORTRAN")
+    fields.Finalise()
 
-    for _ in range(0,1):
-        pre_inc = [0] * 1
-        tolerances = [1e-5, 1e-5, 1e-5, 1e-5, 1e-5, 1e-5, 1e-5]
-        its = 1
+    # += iterations through increments for solution
+    pre_inc = [15000/LOADSTEPS] * LOADSTEPS
+    print('+= ... begin solver')
+    for i, inc in enumerate(range(0, len(pre_inc))):
 
-        for i in range(0, len(pre_inc)):
-            inc = pre_inc[i]
-            tol = tolerances[i]
-
-            # +============+ 
-            # Problem and Solution infrastructure
-            # +============+ 
-            
-            cmfe_problem, cmfe_solver, cmfe_solver_eqs = cmfe.problem_solver_setup(problem_n, cmfe_eqs_set, its)
-            cmfe.boundary_conditions_setup(cmfe_solver_eqs, cmfe_dep_field, n_n, n_np_xyz, inc)
-
-            cmfe_problem.Solve()
-            cmfe_problem.Finalise()
-            cmfe_solver_eqs.Finalise()
+        # +============+ 
+        # Problem and Solution infrastructure
+        # +============+ 
+        
+        # +==+ cmfe problem and solver field
+        cmfe_problem, cmfe_solver, cmfe_solver_eqs = cmfe.problem_solver_setup(
+            problem_n, cmfe_eqs_set, LOADSTEPS
+        )
+        # +==+ cmfe boundary conditions
+        cmfe.boundary_conditions_setup(cmfe_solver_eqs, cmfe_dep_field, n_n, n_np_xyz, inc)
+        # += solver for current iterations
+        print("+===============================================================+")
+        print(f'+= ... begin increment {i}')
+        print("+===============================================================+")
+        cmfe_problem.Solve()
+        cmfe_problem.Finalise()
+        cmfe_solver_eqs.Finalise()
+    print('+==+ SOLVER COMPLETE')
 
     # +============+ 
     # Deformed Fields and Export infrastructure
     # +============+ 
 
+    # +==+ cmfe deformed field
     cmfe_def_field = cmfe.deformed_setup(def_field_n, cmfe_region, cmfe_decomp, cmfe_dep_field)
+    print('+==+ DEFORMED FIELD COMPLETE')
+    # +==+ cmfe pressure field
     cmfe_pre_field = cmfe.pressure_setup(cmfe_region, cmfe_decomp, pre_field_n)
-    cmfe_dep_field.ParametersToFieldParametersComponentCopy(
-        iron.FieldVariableTypes.U,
-        iron.FieldParameterSetTypes.VALUES, X,
-        cmfe_def_field, iron.FieldVariableTypes.U,
-        iron.FieldParameterSetTypes.VALUES, X
-    )
-    cmfe_dep_field.ParametersToFieldParametersComponentCopy(
-        iron.FieldVariableTypes.U,
-        iron.FieldParameterSetTypes.VALUES, Y,
-        cmfe_def_field, iron.FieldVariableTypes.U,
-        iron.FieldParameterSetTypes.VALUES, Y
-    )
-    cmfe_dep_field.ParametersToFieldParametersComponentCopy(
-        iron.FieldVariableTypes.U,
-        iron.FieldParameterSetTypes.VALUES, Z,
-        cmfe_def_field, iron.FieldVariableTypes.U,
-        iron.FieldParameterSetTypes.VALUES, Z
-    )
+    print('+==+ PRESSURE FIELD COMPLETE')
+    # += setup deformed field with new values
+    print('+= ... begin deformed mesh setup')
+    for i in [X, Y, Z]:
+        cmfe_dep_field.ParametersToFieldParametersComponentCopy(
+            iron.FieldVariableTypes.U,
+            iron.FieldParameterSetTypes.VALUES, i,
+            cmfe_def_field, iron.FieldVariableTypes.U,
+            iron.FieldParameterSetTypes.VALUES, i
+        )
     cmfe_dep_field.ParametersToFieldParametersComponentCopy(
         iron.FieldVariableTypes.U,
         iron.FieldParameterSetTypes.VALUES,
@@ -224,12 +243,11 @@ def main(test_name):
         iron.FieldParameterSetTypes.VALUES, 
         1
     )
-    fields = iron.Fields()
-    fields.CreateRegion(cmfe_region)
-    fields.NodesExport("Output", "FORTRAN")
-    fields.ElementsExport("Output", "FORTRAN")
-    fields.Finalise()
-    cmfe.vtk_output(cmfe_mesh, n_n, cmfe_geo_field, cmfe_dep_field, e_np_map, cmfe_mesh_e, RUNTIME_PATH)
+    print('+==+ DEPENDENT FIELD COMPLETE')
+
+    # cmfe & meshio output
+    cmfe.vtk_output(cmfe_mesh, n_n, cmfe_geo_field, cmfe_dep_field, e_np_map, cmfe_mesh_e, RUNTIME_PATH, test_name)
+    print('+==+ EXPORT COMPLETE')
 
     # +============+ 
     # Wrap it up
