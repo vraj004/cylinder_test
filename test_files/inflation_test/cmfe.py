@@ -11,28 +11,16 @@ import meshio
 # Runtime required parameters
 X, Y, Z, P = (1, 2, 3, 4)
 
-# Required Node Numbering:
-#         VTK            Gmsh
-#   *           top
-#   *  7--14--6     *  7--19--6
-#   *  |      |     *  |      |
-#   * 15  25  13    * 17  25  18
-#   *  |      |     *  |      |
-#   *  4--12--5     *  4--16--5
-#   *
-#   *           middle
-#   * 19--23--18    * 15--24--14
-#   *  |      |     *  |      |
-#   * 20  26  21    * 22  26  23
-#   *  |      |     *  |      |
-#   * 16--22--17    * 10--21--12
-#   *
-#   *           bottom
-#   *  3--10--2     *  3--13--2
-#   *  |      |     *  |      |
-#   * 11  24  9     *  9  20  11
-#   *  |      |     *  |      |
-#   *  0-- 8--1     *  0-- 8--1
+IRON_VTK = [
+    0, 2, 8, 6, 
+    18, 20, 26, 24,
+    1, 5, 7, 3, 
+    19, 13, 25, 21,
+    9, 11, 17, 15, 
+    12, 14, 10, 16,
+    4, 22, 13
+]
+
 GMSH2VTK = [
     0, 1, 2, 3, 4, 5, 6, 7,
     8, 11, 13, 9, 16, 18, 19, 17,
@@ -280,31 +268,39 @@ def boundary_conditions_setup(solver_eqs, dep_field, n_n, n_np_xyz, pre):
     min_z = np.min(n_np_xyz[:, 2])
     max_z = np.max(n_np_xyz[:, 2])
     for i in range(0, n_n, 1):
-        if n_np_xyz[i, 0] == max_z: 
+        # for j in [X, Y, Z]:
+        #         bcs.AddNode(
+        #             dep_field, 
+        #             iron.FieldVariableTypes.U,
+        #             1, 1, i+1, j,
+        #             iron.BoundaryConditionsTypes.FIXED,
+        #             0.0
+        #         )
+        if n_np_xyz[i, 2] == max_z: 
             bcs.AddNode(
                 dep_field, 
                 iron.FieldVariableTypes.U,
-                1, 1, i+1, X,
+                1, 1, i+1, Z,
                 iron.BoundaryConditionsTypes.FIXED,
                 0.02
             )
         else: 
-            if n_np_xyz[i, 0] == max_z: 
+            if n_np_xyz[i, 2] == min_z: 
                 bcs.AddNode(
                 dep_field, 
                 iron.FieldVariableTypes.U,
-                1, 1, i+1, X,
+                1, 1, i+1, Z,
                 iron.BoundaryConditionsTypes.FIXED,
                 0.0
             )
-            for j in [Y, Z]:
+            for j in [X, Y]:
                 bcs.AddNode(
-                dep_field, 
-                iron.FieldVariableTypes.U,
-                1, 1, i+1, j,
-                iron.BoundaryConditionsTypes.FIXED,
-                0.0
-            )
+                    dep_field, 
+                    iron.FieldVariableTypes.U,
+                    1, 1, i+1, j,
+                    iron.BoundaryConditionsTypes.FIXED,
+                    0.0
+                )
             # bcs.AddNode(dep_field, 
             #             iron.FieldVariableTypes.DELUDELN, 1,
             #             iron.GlobalDerivativeConstants.NO_GLOBAL_DERIV, 
@@ -357,7 +353,7 @@ def pressure_setup(region, decomp, pre_field_n):
 #    
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
 
-def vtk_output(mesh, n_n, geo_field, dep_field, e_np_map, mesh_e, runtime_path, test_name):
+def vtk_output(mesh, n_n, geo_field, dep_field, e_np_map, mesh_e, runtime_path, test_name, convention):
     # +============+ 
     # Store nodes Before & After deformation
     # +============+ 

@@ -29,6 +29,76 @@ LOADSTEPS = 5
 INNER_RAD = 0.375
 C_VALS = [1, 0.2]
 RUNTIME_PATH = "/home/jovyan/work/docker-iron/test_files/inflation_test/runtime_files/"
+GMSH2VTK = [
+    0, 1, 2, 3, 4, 5, 6, 7,
+    8, 11, 13, 9, 16, 18, 19, 17,
+    10, 12, 14, 15, 22, 23, 21, 24,
+    20, 25, 26
+]
+
+# Iron Numbering for 27?
+#   *  z = 0           z = 0.5         z = 1          
+#   *  6--7 --8     * 15--16--17    x 24--25--26
+#   *  |      |     *  |      |     x  |      |
+#   *  3  4   5     * 12  13  14    x 21  22  23
+#   *  |      |     *  |      |     x  |      |
+#   *  0--1 --2     *  9--10--11    x 18--19--20
+
+# Gmsh Numbering for Hexa-27
+#   *  z = 0           z = 0.5         z = 1    
+#   *  3--13--2     * 15--24--14    *  7--19--6      
+#   *  |      |     *  |      |     *  |      |       
+#   *  9  20  11    * 22  26  23    * 17  25  18     
+#   *  |      |     *  |      |     *  |      |     
+#   *  0-- 8--1     * 10--21--12    *  4--16--5       
+
+# VTK Numbering for Hexa-27
+#   *  z = 0           z = 0.5         z = 1    
+#   *  3--10--2     * 19--23--18    x  7--14--6
+#   *  |      |     *  |      |     x  |      |
+#   * 11  24  9     * 20  26  21    x 15  25  13
+#   *  |      |     *  |      |     x  |      |
+#   *  0-- 8--1     * 16--22--17    x  4--12--5 
+
+abc = [0, 8, 1, 9, 20, 11, 3, 13, 2, 10, 21, 12, 22, 26, 23, 15, 24, 14, 4, 16, 5, 17, 25, 18, 7, 19, 6]
+
+# Bottom Left -> Anti-Clockwise {VTK Standard}
+VERTICES = {
+    "IRON": [0, 2, 8, 6, 18, 20, 26, 24],
+    "GMSH": [0, 1, 2, 3, 4, 5, 6, 7],
+    "VTK": [0, 1, 2, 3, 4, 5, 6, 7]
+}
+
+# Bottom Middle -> Anti-Clockwise {VTK Standard}
+MIDEDGE = {
+    "IRON": [1, 5, 7, 3, 19, 23, 25, 21, 9, 11, 17, 15],
+    "GMSH": [8, 11, 13, 9, 16, 18, 19, 17, 10, 12, 14, 15],
+    "VTK": [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+}
+
+# Middle Left -> Across, Down, Up, Bottom, Top, Middle {VTK Standard}
+FACEINTERIOR = {
+    "IRON": [12, 14, 10, 16, 4, 22, 13],
+    "GMSH": [22, 23, 21, 24, 20, 25, 26],
+    "VTK": [20, 21, 22, 23, 24, 25, 26]
+}
+
+GMSH_IRON = [
+    0, 8, 1, 9, 20, 11, 3, 13, 
+    2, 10, 21, 12, 22, 26, 23, 15, 
+    24, 14, 4, 16, 5, 17, 25, 18, 
+    7, 19, 6
+]
+
+IRON_VTK = [
+    0, 2, 8, 6, 
+    18, 20, 26, 24,
+    1, 5, 7, 3, 
+    19, 13, 25, 21,
+    9, 11, 17, 15, 
+    12, 14, 10, 16,
+    4, 22, 13
+]
 
 # Unique user number identifiers
 (
@@ -41,6 +111,18 @@ RUNTIME_PATH = "/home/jovyan/work/docker-iron/test_files/inflation_test/runtime_
 # +==+ ^\_/^ +==+ ^\_/^ +==+
 # Node and Element setup from input files
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
+
+def cvtNodeNumbering(prior, after):
+    vtk = np.array(VERTICES["VTK"] + MIDEDGE["VTK"] + FACEINTERIOR["VTK"])
+    input_nodes = np.array(VERTICES[prior] + MIDEDGE[prior] + FACEINTERIOR[prior])
+    output_nodes = np.array(VERTICES[after] + MIDEDGE[after] + FACEINTERIOR[after])
+    cvtInput2VTK = []
+    cvtVTK2Output = []
+    for node in vtk:
+        cvtInput2VTK.append(np.where(input_nodes==node)[0][0])
+    for node in output_nodes:
+        cvtVTK2Output.append(np.where(input_nodes==node)[0][0])
+    return cvtVTK2Output
 
 def nodes(test_name):
     n_idx = []
@@ -63,6 +145,7 @@ def elems(test_name):
             line = line.strip().split('\t')
             e_idx.append(i)
             e_map.append(line[3:])
+            
     e_np_map = np.array(e_map).astype(int)
     return e_np_map, e_idx, i
 
@@ -111,10 +194,14 @@ def main(test_name):
     cmfe_mesh_e.CreateStart(cmfe_mesh, 1, cmfe_basis)
     # += allocating nodes to elements
     print('+= ... begin mesh allocation')
+    gmsh2iron = cvtNodeNumbering("GMSH", "VTK")
     for i in range(e_n):
         nodesList = list(
-            map(int,e_np_map[i][:])
+            map(int,[e_np_map[i][idx] for idx in abc])
         )
+        # nodesList = list(
+        #     map(int,e_np_map[i][:])
+        # )
         cmfe_mesh_e.NodesSet(e_idx[i], nodesList)
     # +=
     cmfe_mesh_e.CreateFinish()
@@ -190,7 +277,6 @@ def main(test_name):
     fields.NodesExport("Output", "FORTRAN")
     fields.ElementsExport("Output", "FORTRAN")
     fields.Finalise()
-
     # += iterations through increments for solution
     pre_inc = [15000/LOADSTEPS] * LOADSTEPS
     print('+= ... begin solver')
@@ -246,7 +332,10 @@ def main(test_name):
     print('+==+ DEPENDENT FIELD COMPLETE')
 
     # cmfe & meshio output
-    cmfe.vtk_output(cmfe_mesh, n_n, cmfe_geo_field, cmfe_dep_field, e_np_map, cmfe_mesh_e, RUNTIME_PATH, test_name)
+    cmfe.vtk_output(
+        cmfe_mesh, n_n, cmfe_geo_field, cmfe_dep_field, e_np_map, 
+        cmfe_mesh_e, RUNTIME_PATH, test_name, cvtNodeNumbering("GMSH", "VTK")
+    )
     print('+==+ EXPORT COMPLETE')
 
     # +============+ 
