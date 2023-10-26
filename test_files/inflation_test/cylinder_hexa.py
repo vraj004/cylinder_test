@@ -25,9 +25,11 @@ N_N_EL = 27
 QUAD_ORDER = 4
 X, Y, Z, P = (1, 2, 3, 4)
 PRESSURE_TEST = True
-LOADSTEPS = 5
+LOADSTEPS = 10
 INNER_RAD = 0.375
 C_VALS = [1, 0.2]
+PRESSURE_VAL = 1.5
+TRANSLATION_VAL = 0.2
 RUNTIME_PATH = "/home/jovyan/work/docker-iron/test_files/inflation_test/runtime_files/"
 GMSH2VTK = [
     0, 1, 2, 3, 4, 5, 6, 7,
@@ -278,10 +280,12 @@ def main(test_name):
     fields.ElementsExport("Output", "FORTRAN")
     fields.Finalise()
     # += iterations through increments for solution
-    pre_inc = [15000/LOADSTEPS] * LOADSTEPS
+    pressure_inc = [PRESSURE_VAL/LOADSTEPS] * LOADSTEPS
+    translation_inc = [TRANSLATION_VAL/LOADSTEPS] * LOADSTEPS
     print('+= ... begin solver')
-    for i, inc in enumerate(range(0, len(pre_inc))):
-
+    for i in range(0, len(pressure_inc), 1):
+        curr_p = pressure_inc[i]
+        curr_t = translation_inc[i]
         # +============+ 
         # Problem and Solution infrastructure
         # +============+ 
@@ -291,7 +295,7 @@ def main(test_name):
             problem_n, cmfe_eqs_set, LOADSTEPS
         )
         # +==+ cmfe boundary conditions
-        cmfe.boundary_conditions_setup(cmfe_solver_eqs, cmfe_dep_field, n_n, n_np_xyz, inc)
+        cmfe.boundary_conditions_setup(cmfe_solver_eqs, cmfe_dep_field, n_n, n_np_xyz, curr_p, curr_t)
         # += solver for current iterations
         print("+===============================================================+")
         print(f'+= ... begin increment {i}')
@@ -353,5 +357,5 @@ def main(test_name):
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
 
 if __name__ == '__main__':
-    test_name = "hexa_test"
+    test_name = "cylinder_hexa_test"
     main(test_name)

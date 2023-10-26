@@ -262,7 +262,7 @@ def problem_solver_setup(problem_n, eqs_set, loadsteps):
     problem.SolverEquationsCreateFinish()
     return problem, solver, solver_eqs
 
-def boundary_conditions_setup(solver_eqs, dep_field, n_n, n_np_xyz, pre):
+def boundary_conditions_setup(solver_eqs, dep_field, n_n, n_np_xyz, pre, tra):
     bcs = iron.BoundaryConditions()
     solver_eqs.BoundaryConditionsCreateStart(bcs)
     min_z = np.min(n_np_xyz[:, 2])
@@ -282,7 +282,7 @@ def boundary_conditions_setup(solver_eqs, dep_field, n_n, n_np_xyz, pre):
                 iron.FieldVariableTypes.U,
                 1, 1, i+1, Z,
                 iron.BoundaryConditionsTypes.FIXED,
-                0.02
+                tra
             )
         else: 
             if n_np_xyz[i, 2] == min_z: 
