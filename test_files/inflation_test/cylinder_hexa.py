@@ -24,12 +24,12 @@ XI_N = 3
 N_N_EL = 27
 QUAD_ORDER = 4
 X, Y, Z, P = (1, 2, 3, 4)
-PRESSURE_TEST = True
+PRESSURE_NODE = True
 LOADSTEPS = 1
 INNER_RAD = 0.375
-C_VALS = [1, 0.2]
-PRESSURE_VAL = 1
-TRANSLATION_VAL = 0.2
+C_VALS = [0.2, 0.6]
+PRESSURE_VAL = 0.000015
+TRANSLATION_VAL = 0.02
 RUNTIME_PATH = "/home/jovyan/work/docker-iron/test_files/inflation_test/runtime_files/"
 GMSH2VTK = [
     0, 1, 2, 3, 4, 5, 6, 7,
@@ -162,6 +162,7 @@ def main(test_name):
     # +============+  
     
     # +==+ cmfe coordainte system
+
     cmfe_coord = cmfe.coordinate_setup(coord_n, DIM)
     print('+==+ COORDINATE SYSTEM COMPLETE')
     # +==+ cmfe basis system
@@ -242,6 +243,14 @@ def main(test_name):
     print('+==+ MATERIAL FIELD COMPLETE')
     # +==+ cmfe dependent field
     cmfe_dep_field = cmfe.dependent_setup(dep_field_n, cmfe_region, cmfe_decomp, cmfe_geo_field)
+    for i in [X, Y, Z]:
+        iron.Field.ParametersToFieldParametersComponentCopy(
+            cmfe_geo_field, iron.FieldVariableTypes.U, iron.FieldParameterSetTypes.VALUES, i,
+            cmfe_dep_field, iron.FieldVariableTypes.U, iron.FieldParameterSetTypes.VALUES, i
+        )
+    iron.Field.ComponentValuesInitialiseDP(
+        cmfe_dep_field, iron.FieldVariableTypes.U, iron.FieldParameterSetTypes.VALUES, P, 0.0
+    )
     print('+==+ DEPENDENT FIELD COMPLETE')
 
     # +============+  
@@ -280,8 +289,9 @@ def main(test_name):
     fields.ElementsExport("Output", "FORTRAN")
     fields.Finalise()
     # += iterations through increments for solution
-    pressure_inc = [PRESSURE_VAL/LOADSTEPS] * LOADSTEPS
-    translation_inc = [TRANSLATION_VAL/LOADSTEPS] * LOADSTEPS
+    # pressure_inc = [1.0 * 1/25, 1.0 * 1/25, 1.0 * 1/25, 2.0 * 1/25, 2.0 * 1/25, 2.0 * 1/25, 1.0 * 1/25]
+    pressure_inc = [PRESSURE_VAL] * LOADSTEPS
+    translation_inc = [TRANSLATION_VAL/LOADSTEPS] * len(pressure_inc)
     print('+= ... begin solver')
     for i in range(0, len(pressure_inc), 1):
         curr_p = pressure_inc[i]
@@ -298,7 +308,7 @@ def main(test_name):
         cmfe.boundary_conditions_setup(cmfe_solver_eqs, cmfe_dep_field, n_n, n_np_xyz, curr_p, curr_t)
         # += solver for current iterations
         print("+===============================================================+")
-        print(f'+= ... begin increment {i}')
+        print(f'+= increment {i} =+')
         print("+===============================================================+")
         cmfe_problem.Solve()
         cmfe_problem.Finalise()
@@ -346,6 +356,15 @@ def main(test_name):
     # Wrap it up
     # +============+ 
 
+    results = {}
+    elementNumber = 1
+    p = cmfe_dep_field.ParameterSetGetElement(
+    iron.FieldVariableTypes.U,
+    iron.FieldParameterSetTypes.VALUES,elementNumber,4)
+    results['Hydrostatic pressure'] = p
+    print("Hydrostatic pressure")
+    print(p)
+
     # cmfe_problem.Destroy()
     cmfe_coord.Destroy()
     cmfe_region.Destroy()
@@ -357,5 +376,5 @@ def main(test_name):
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
 
 if __name__ == '__main__':
-    test_name = "cylinder_hexa_test_2Layer"
+    test_name = "gmsh_cylinder"
     main(test_name)

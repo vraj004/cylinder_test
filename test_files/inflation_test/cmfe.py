@@ -32,7 +32,8 @@ GMSH2VTK = [
 EXTENSION_TEST = False
 PRESSURE_TEST = True
 INNER_RAD = 1
-TOL_VEC = 1e-2
+OUTER_RAD = 1.5
+TOL_VEC = 1e-7
 
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
 # Coordinate System:
@@ -68,6 +69,7 @@ def basis_setup(basis_n, xi_n):
     )
     basis.QuadratureNumberOfGaussXiSet([3]*xi_n)
     basis.CreateFinish()
+
     return basis
 
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
@@ -181,6 +183,8 @@ def dependent_setup(dep_field_n, region, decomp, geo_field):
     dep_field.NumberOfVariablesSet(2)
     dep_field.NumberOfComponentsSet(iron.FieldVariableTypes.U, 4)
     dep_field.NumberOfComponentsSet(iron.FieldVariableTypes.DELUDELN, 4)
+
+
     dep_field.ComponentInterpolationSet(
         iron.FieldVariableTypes.U, 4,
         iron.FieldInterpolationTypes.ELEMENT_BASED)
@@ -188,14 +192,7 @@ def dependent_setup(dep_field_n, region, decomp, geo_field):
         iron.FieldVariableTypes.DELUDELN, 4,
         iron.FieldInterpolationTypes.ELEMENT_BASED)
     dep_field.CreateFinish()
-    for i in [X, Y, Z]:
-        iron.Field.ParametersToFieldParametersComponentCopy(
-            geo_field, iron.FieldVariableTypes.U, iron.FieldParameterSetTypes.VALUES, i,
-            dep_field, iron.FieldVariableTypes.U, iron.FieldParameterSetTypes.VALUES, i
-        )
-    iron.Field.ComponentValuesInitialiseDP(
-        dep_field, iron.FieldVariableTypes.U, iron.FieldParameterSetTypes.VALUES, P, 0
-    )
+    
     return dep_field
 
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
@@ -284,6 +281,11 @@ def boundary_conditions_setup(solver_eqs, dep_field, n_n, n_np_xyz, pre, tra):
                     iron.BoundaryConditionsTypes.FIXED,
                     tra
                 )
+                # bcs.AddNode(dep_field, 
+                #     iron.FieldVariableTypes.DELUDELN, 1, 1, i+1, Z,
+                #     iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED, 
+                #     pre
+                # )
             else: 
                 if n_np_xyz[i, 2] == min_z: 
                     bcs.AddNode(
@@ -303,6 +305,10 @@ def boundary_conditions_setup(solver_eqs, dep_field, n_n, n_np_xyz, pre, tra):
                     )
         # +==+ PRESSURE OPTION
         if PRESSURE_TEST:
+            # vec_norm = np.linalg.norm([n_np_xyz[i, 0], n_np_xyz[i, 1]])
+            vec = np.array([n_np_xyz[i, 0], n_np_xyz[i, 1]])
+            vec_norm = np.sqrt(vec.dot(vec))
+            # node = []
             # if n_np_xyz[i, 0] == np.max(n_np_xyz[:, 0]):
             #         bcs.AddNode(dep_field, 
             #                     iron.FieldVariableTypes.DELUDELN, 1, 1, i+1, X,
@@ -318,8 +324,50 @@ def boundary_conditions_setup(solver_eqs, dep_field, n_n, n_np_xyz, pre, tra):
             #             iron.BoundaryConditionsTypes.FIXED,
             #             0.0
             #         )
-            if n_np_xyz[i, 2] == min_z or n_np_xyz[i, 2] == max_z: 
-                for j in [X, Y, Z]:
+            # if n_np_xyz[i, 2] == min_z: # and vec_norm == OUTER_RAD: # or n_np_xyz[i, 2] == max_z: 
+            #     for j in [X, Y, Z]:
+            #         bcs.AddNode(
+            #             dep_field, 
+            #             iron.FieldVariableTypes.U,
+            #             1, 1, i+1, j,
+            #             iron.BoundaryConditionsTypes.FIXED,
+            #             0.0
+            #         )
+                # print(f"FIXED NODE: {i} at norm = {vec_norm}")
+                # print(vec)
+            # if vec_norm == INNER_RAD: 
+  
+            # if np.isclose(0, n_np_xyz[i, 0], 1e-3): 
+            #     for j in [X]:
+            #         bcs.AddNode(
+            #             dep_field, 
+            #             iron.FieldVariableTypes.U,
+            #             1, 1, i+1, j,
+            #             iron.BoundaryConditionsTypes.FIXED,
+            #             0.0
+            #         )
+            # if np.isclose(0, n_np_xyz[i, 1], 1e-3): 
+            #     for j in [Y]:
+            #         bcs.AddNode(
+            #             dep_field, 
+            #             iron.FieldVariableTypes.U,
+            #             1, 1, i+1, j,
+            #             iron.BoundaryConditionsTypes.FIXED,
+            #             0.0
+            #         )
+            # if np.isclose(np.min(n_np_xyz[:, 2]), n_np_xyz[i, 2], 1e-3) or np.isclose(np.max(n_np_xyz[:, 2]), n_np_xyz[i, 2], 1e-3): 
+            #     for j in [Z]:
+            #         bcs.AddNode(
+            #             dep_field, 
+            #             iron.FieldVariableTypes.U,
+            #             1, 1, i+1, j,
+            #             iron.BoundaryConditionsTypes.FIXED,
+            #             0.0
+            #         )
+            # if np.isclose(np.min(n_np_xyz[:, 2]), n_np_xyz[i, 2], 1e-3): 
+            # # else:
+            if np.isclose(vec_norm, OUTER_RAD, 1e-5) and np.isclose(np.min(n_np_xyz[:, 2]), n_np_xyz[i, 2], 1e-3): 
+                for j in [Z]:
                     bcs.AddNode(
                         dep_field, 
                         iron.FieldVariableTypes.U,
@@ -327,21 +375,27 @@ def boundary_conditions_setup(solver_eqs, dep_field, n_n, n_np_xyz, pre, tra):
                         iron.BoundaryConditionsTypes.FIXED,
                         0.0
                     )
-            else:
-                vec_norm = np.linalg.norm([n_np_xyz[i, 0], n_np_xyz[i, 1]])
-                x_pre = abs(pre * n_np_xyz[i, 0] / vec_norm)
-                y_pre = abs(pre * n_np_xyz[i, 1] / vec_norm)
-                if abs(vec_norm - INNER_RAD) < TOL_VEC: 
-                        bcs.AddNode(dep_field, 
-                                    iron.FieldVariableTypes.DELUDELN, 1, 1, i+1, X,
-                                    iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED, 
-                                    x_pre
-                        )
-                        bcs.AddNode(dep_field, 
-                                    iron.FieldVariableTypes.DELUDELN, 1, 1, i+1, Y,
-                                    iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED, 
-                                    y_pre
-                        )
+            if np.isclose(vec_norm, INNER_RAD, 1e-5) or np.isclose(vec_norm, OUTER_RAD, 1e-5):
+                bcs.AddNode(
+                        dep_field, 
+                        iron.FieldVariableTypes.U,
+                        1, 1, i+1, X,
+                        iron.BoundaryConditionsTypes.FIXED,
+                        0.0005 * n_np_xyz[i, 0]
+                    )
+                bcs.AddNode(
+                        dep_field, 
+                        iron.FieldVariableTypes.U,
+                        1, 1, i+1, Y,
+                        iron.BoundaryConditionsTypes.FIXED,
+                        0.0005 * n_np_xyz[i, 1]
+                    )
+                # bcs.AddNode(dep_field, 
+                #     iron.FieldVariableTypes.DELUDELN, 1, 1, i+1, Z,
+                #     iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED, 
+                #     pre
+                # )
+
     solver_eqs.BoundaryConditionsCreateFinish()
     return 
 
