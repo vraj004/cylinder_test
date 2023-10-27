@@ -6,6 +6,7 @@ Descrption: cmiss setup funtions for finite element implementation of
 
 import numpy as np
 from opencmiss.iron import iron
+from datetime import datetime
 import meshio
 
 # Runtime required parameters
@@ -27,6 +28,11 @@ GMSH2VTK = [
     10, 12, 14, 15, 22, 23, 21, 24,
     20, 25, 26
 ]
+
+EXTENSION_TEST = False
+PRESSURE_TEST = True
+INNER_RAD = 1
+TOL_VEC = 1e-2
 
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
 # Coordinate System:
@@ -268,46 +274,74 @@ def boundary_conditions_setup(solver_eqs, dep_field, n_n, n_np_xyz, pre, tra):
     min_z = np.min(n_np_xyz[:, 2])
     max_z = np.max(n_np_xyz[:, 2])
     for i in range(0, n_n, 1):
-        # for j in [X, Y, Z]:
-        #         bcs.AddNode(
-        #             dep_field, 
-        #             iron.FieldVariableTypes.U,
-        #             1, 1, i+1, j,
-        #             iron.BoundaryConditionsTypes.FIXED,
-        #             0.0
-        #         )
-        if n_np_xyz[i, 2] == max_z: 
-            bcs.AddNode(
-                dep_field, 
-                iron.FieldVariableTypes.U,
-                1, 1, i+1, Z,
-                iron.BoundaryConditionsTypes.FIXED,
-                tra
-            )
-        else: 
-            if n_np_xyz[i, 2] == min_z: 
-                bcs.AddNode(
-                dep_field, 
-                iron.FieldVariableTypes.U,
-                1, 1, i+1, Z,
-                iron.BoundaryConditionsTypes.FIXED,
-                0.0
-            )
-            for j in [X, Y]:
+        # +==+ EXTENSION OPTION
+        if EXTENSION_TEST:
+            if n_np_xyz[i, 2] == max_z: 
                 bcs.AddNode(
                     dep_field, 
                     iron.FieldVariableTypes.U,
-                    1, 1, i+1, j,
+                    1, 1, i+1, Z,
+                    iron.BoundaryConditionsTypes.FIXED,
+                    tra
+                )
+            else: 
+                if n_np_xyz[i, 2] == min_z: 
+                    bcs.AddNode(
+                    dep_field, 
+                    iron.FieldVariableTypes.U,
+                    1, 1, i+1, Z,
                     iron.BoundaryConditionsTypes.FIXED,
                     0.0
                 )
-            # bcs.AddNode(dep_field, 
-            #             iron.FieldVariableTypes.DELUDELN, 1,
-            #             iron.GlobalDerivativeConstants.NO_GLOBAL_DERIV, 
-            #             i+1, Z,
-            #             iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED, 
-            #             pre
-            # )
+                for j in [X, Y]:
+                    bcs.AddNode(
+                        dep_field, 
+                        iron.FieldVariableTypes.U,
+                        1, 1, i+1, j,
+                        iron.BoundaryConditionsTypes.FIXED,
+                        0.0
+                    )
+        # +==+ PRESSURE OPTION
+        if PRESSURE_TEST:
+            # if n_np_xyz[i, 0] == np.max(n_np_xyz[:, 0]):
+            #         bcs.AddNode(dep_field, 
+            #                     iron.FieldVariableTypes.DELUDELN, 1, 1, i+1, X,
+            #                     iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED, 
+            #                     pre
+            #         )
+            # if n_np_xyz[i, 0] == np.min(n_np_xyz[:, 0]):
+            #     for j in [X]:
+            #         bcs.AddNode(
+            #             dep_field, 
+            #             iron.FieldVariableTypes.U,
+            #             1, 1, i+1, j,
+            #             iron.BoundaryConditionsTypes.FIXED,
+            #             0.0
+            #         )
+            if n_np_xyz[i, 2] == min_z or n_np_xyz[i, 2] == max_z: 
+                for j in [X, Y, Z]:
+                    bcs.AddNode(
+                        dep_field, 
+                        iron.FieldVariableTypes.U,
+                        1, 1, i+1, j,
+                        iron.BoundaryConditionsTypes.FIXED,
+                        0.0
+                    )
+            else:
+                vec_norm = np.linalg.norm([n_np_xyz[i, 0], n_np_xyz[i, 1]])
+                x_pre = abs(pre * n_np_xyz[i, 0] / vec_norm)
+                y_pre = abs(pre * n_np_xyz[i, 1] / vec_norm)
+                if abs(vec_norm - INNER_RAD) < TOL_VEC: 
+                        bcs.AddNode(dep_field, 
+                                    iron.FieldVariableTypes.DELUDELN, 1, 1, i+1, X,
+                                    iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED, 
+                                    x_pre
+                        )
+                        bcs.AddNode(dep_field, 
+                                    iron.FieldVariableTypes.DELUDELN, 1, 1, i+1, Y,
+                                    iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED, 
+                                    y_pre
+                        )
     solver_eqs.BoundaryConditionsCreateFinish()
     return 
 
@@ -430,8 +464,10 @@ def vtk_output(mesh, n_n, geo_field, dep_field, e_np_map, mesh_e, runtime_path, 
     # +============+
     e_list_gmsh = np.array(e_list)[:,:] - 1
     e_list_vtk = e_list_gmsh[:, GMSH2VTK]
+    now = datetime.now()
+    current_time = now.strftime("%H%M%S")
     meshio.write_points_cells(
-        runtime_path + test_name + ".vtk", 
+        runtime_path + test_name + current_time + ".vtk", 
         bef_def, 
         [("hexahedron27", e_list_vtk)] + [("hexahedron27", e_list_vtk)], 
         {"deformed": aft_def}

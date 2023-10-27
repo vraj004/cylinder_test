@@ -25,10 +25,10 @@ N_N_EL = 27
 QUAD_ORDER = 4
 X, Y, Z, P = (1, 2, 3, 4)
 PRESSURE_TEST = True
-LOADSTEPS = 10
+LOADSTEPS = 1
 INNER_RAD = 0.375
 C_VALS = [1, 0.2]
-PRESSURE_VAL = 1.5
+PRESSURE_VAL = 1
 TRANSLATION_VAL = 0.2
 RUNTIME_PATH = "/home/jovyan/work/docker-iron/test_files/inflation_test/runtime_files/"
 GMSH2VTK = [
@@ -357,5 +357,5 @@ def main(test_name):
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
 
 if __name__ == '__main__':
-    test_name = "cylinder_hexa_test"
+    test_name = "cylinder_hexa_test_2Layer"
     main(test_name)
