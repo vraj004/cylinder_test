@@ -11,8 +11,9 @@ Output: vtk_files/cylinder_hexa.vtk
 """
 
 import numpy as np
+import argparse
 from opencmiss.iron import iron
-import cmfe
+import cmfe_pressure as cmfe
 
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
 # Parameter Setup
@@ -27,8 +28,8 @@ X, Y, Z, P = (1, 2, 3, 4)
 PRESSURE_NODE = True
 LOADSTEPS = 1
 INNER_RAD = 0.375
-C_VALS = [0.2, 0.6]
-PRESSURE_VAL = 0.000015
+C_VALS = [2, 6]
+PRESSURE_VAL = -1
 TRANSLATION_VAL = 0.02
 RUNTIME_PATH = "/home/jovyan/work/docker-iron/test_files/inflation_test/runtime_files/"
 GMSH2VTK = [
@@ -155,7 +156,7 @@ def elems(test_name):
 # Main function for safe operation of inflation test
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
 
-def main(test_name):
+def main(test_name, test_type):
 
     # +============+  
     # Base infrastructure
@@ -348,7 +349,7 @@ def main(test_name):
     # cmfe & meshio output
     cmfe.vtk_output(
         cmfe_mesh, n_n, cmfe_geo_field, cmfe_dep_field, e_np_map, 
-        cmfe_mesh_e, RUNTIME_PATH, test_name, cvtNodeNumbering("GMSH", "VTK")
+        cmfe_mesh_e, RUNTIME_PATH, test_name, cvtNodeNumbering("GMSH", "VTK"), test_type
     )
     print('+==+ EXPORT COMPLETE')
 
@@ -376,5 +377,13 @@ def main(test_name):
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
 
 if __name__ == '__main__':
-    test_name = "gmsh_cylinder"
-    main(test_name)
+    
+    # +==+ Intake Arguments
+    argparser = argparse.ArgumentParser("A python program to run inflation tests in OpenCMISS Iron.")
+    argparser.add_argument("test_file")
+    argparser.add_argument("test_type")
+    args = argparser.parse_args()
+    test_name = args.test_file
+    type_name = args.test_type
+
+    main(test_name, type_name)
