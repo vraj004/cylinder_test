@@ -32,12 +32,6 @@ C_VALS = [2, 6]
 PRESSURE_VAL = -1
 TRANSLATION_VAL = 0.02
 RUNTIME_PATH = "/home/jovyan/work/docker-iron/test_files/inflation_test/runtime_files/"
-GMSH2VTK = [
-    0, 1, 2, 3, 4, 5, 6, 7,
-    8, 11, 13, 9, 16, 18, 19, 17,
-    10, 12, 14, 15, 22, 23, 21, 24,
-    20, 25, 26
-]
 
 # Iron Numbering for 27?
 #   *  z = 0           z = 0.5         z = 1          
@@ -63,69 +57,68 @@ GMSH2VTK = [
 #   *  |      |     *  |      |     x  |      |
 #   *  0-- 8--1     * 16--22--17    x  4--12--5 
 
-abc = [0, 8, 1, 9, 20, 11, 3, 13, 2, 10, 21, 12, 22, 26, 23, 15, 24, 14, 4, 16, 5, 17, 25, 18, 7, 19, 6]
-
-# Bottom Left -> Anti-Clockwise {VTK Standard}
-VERTICES = {
-    "IRON": [0, 2, 8, 6, 18, 20, 26, 24],
-    "GMSH": [0, 1, 2, 3, 4, 5, 6, 7],
-    "VTK": [0, 1, 2, 3, 4, 5, 6, 7]
-}
-
-# Bottom Middle -> Anti-Clockwise {VTK Standard}
-MIDEDGE = {
-    "IRON": [1, 5, 7, 3, 19, 23, 25, 21, 9, 11, 17, 15],
-    "GMSH": [8, 11, 13, 9, 16, 18, 19, 17, 10, 12, 14, 15],
-    "VTK": [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
-}
-
-# Middle Left -> Across, Down, Up, Bottom, Top, Middle {VTK Standard}
-FACEINTERIOR = {
-    "IRON": [12, 14, 10, 16, 4, 22, 13],
-    "GMSH": [22, 23, 21, 24, 20, 25, 26],
-    "VTK": [20, 21, 22, 23, 24, 25, 26]
-}
-
-GMSH_IRON = [
-    0, 8, 1, 9, 20, 11, 3, 13, 
-    2, 10, 21, 12, 22, 26, 23, 15, 
-    24, 14, 4, 16, 5, 17, 25, 18, 
-    7, 19, 6
+GMSH2VTK = [
+    0, 1, 2, 3, 4, 5, 6, 
+    7, 8, 11, 13, 9, 16, 18,
+    19, 17, 10, 12, 14, 15, 22,
+    23, 21, 24, 20, 25, 26
 ]
-
+GMSH2IRON = [
+    0, 8, 1, 9, 20, 11, 3, 
+    13, 2, 10, 21, 12, 22, 
+    26, 23, 15, 24, 14, 4, 16, 
+    5, 17, 25, 18, 7, 19, 6
+]
 IRON_VTK = [
-    0, 2, 8, 6, 
-    18, 20, 26, 24,
-    1, 5, 7, 3, 
-    19, 13, 25, 21,
-    9, 11, 17, 15, 
-    12, 14, 10, 16,
-    4, 22, 13
+    0, 2, 8, 6, 18, 20, 26, 
+    24, 1, 5, 7, 3, 19, 13, 
+    25, 21, 9, 11, 17, 15, 12,
+    14, 10, 16, 4, 22, 13
 ]
+
+# # Bottom Left -> Anti-Clockwise {VTK Standard}
+# VERTICES = {
+#     "IRON": [0, 2, 8, 6, 18, 20, 26, 24],
+#     "GMSH": [0, 1, 2, 3, 4, 5, 6, 7],
+#     "VTK": [0, 1, 2, 3, 4, 5, 6, 7]
+# }
+# # Bottom Middle -> Anti-Clockwise {VTK Standard}
+# MIDEDGE = {
+#     "IRON": [1, 5, 7, 3, 19, 23, 25, 21, 9, 11, 17, 15],
+#     "GMSH": [8, 11, 13, 9, 16, 18, 19, 17, 10, 12, 14, 15],
+#     "VTK": [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+# }
+# # Middle Left -> Across, Down, Up, Bottom, Top, Middle {VTK Standard}
+# FACEINTERIOR = {
+#     "IRON": [12, 14, 10, 16, 4, 22, 13],
+#     "GMSH": [22, 23, 21, 24, 20, 25, 26],
+#     "VTK": [20, 21, 22, 23, 24, 25, 26]
+# }
 
 # Unique user number identifiers
 (
-    coord_n, basis_n, region_n, mesh_n, decomp_n,
+    coord_n, quad_basis_n, lin_basis_n, 
+    region_n, mesh_n, decomp_n,
     geo_field_n, dep_field_n, mat_field_n,
-    eqs_field_n, eqs_set_n, problem_n, def_field_n,
-    pre_field_n
-) = range(1, 14)
+    eqs_field_n, eqs_set_n, problem_n, 
+    def_field_n, pre_field_n
+) = range(1, 15)
 
 # +==+ ^\_/^ +==+ ^\_/^ +==+
 # Node and Element setup from input files
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
 
-def cvtNodeNumbering(prior, after):
-    vtk = np.array(VERTICES["VTK"] + MIDEDGE["VTK"] + FACEINTERIOR["VTK"])
-    input_nodes = np.array(VERTICES[prior] + MIDEDGE[prior] + FACEINTERIOR[prior])
-    output_nodes = np.array(VERTICES[after] + MIDEDGE[after] + FACEINTERIOR[after])
-    cvtInput2VTK = []
-    cvtVTK2Output = []
-    for node in vtk:
-        cvtInput2VTK.append(np.where(input_nodes==node)[0][0])
-    for node in output_nodes:
-        cvtVTK2Output.append(np.where(input_nodes==node)[0][0])
-    return cvtVTK2Output
+# def cvtNodeNumbering(prior, after):
+#     vtk = np.array(VERTICES["VTK"] + MIDEDGE["VTK"] + FACEINTERIOR["VTK"])
+#     input_nodes = np.array(VERTICES[prior] + MIDEDGE[prior] + FACEINTERIOR[prior])
+#     output_nodes = np.array(VERTICES[after] + MIDEDGE[after] + FACEINTERIOR[after])
+#     cvtInput2VTK = []
+#     cvtVTK2Output = []
+#     for node in vtk:
+#         cvtInput2VTK.append(np.where(input_nodes==node)[0][0])
+#     for node in output_nodes:
+#         cvtVTK2Output.append(np.where(input_nodes==node)[0][0])
+#     return cvtVTK2Output
 
 def nodes(test_name):
     n_idx = []
@@ -167,8 +160,10 @@ def main(test_name, test_type):
     cmfe_coord = cmfe.coordinate_setup(coord_n, DIM)
     print('+==+ COORDINATE SYSTEM COMPLETE')
     # +==+ cmfe basis system
-    cmfe_basis = cmfe.basis_setup(basis_n, XI_N)
-    print('+==+ BASIS SYSTEM COMPLETE')
+    cmfe_quad_basis = cmfe.basis_setup(quad_basis_n, XI_N, "quadratic")
+    print('+==+ QUAD BASIS SYSTEM COMPLETE')
+    cmfe_lin_basis = cmfe.basis_setup(lin_basis_n, XI_N, "linear")
+    print('+==+ LIN BASIS SYSTEM COMPLETE')
     # +==+ cmfe region system
     cmfe_region = cmfe.region_setup(region_n, cmfe_coord)
     print('+==+ REGION COMPLETE')
@@ -179,6 +174,8 @@ def main(test_name, test_type):
 
     n_np_xyz, n_idx, n_n = nodes(test_name)
     e_np_map, e_idx, e_n = elems(test_name)
+    n_np_xyz_lin, n_idx_lin, n_n_lin = nodes(test_name + "_pressure")
+    e_np_map_lin, e_idx_lin, e_n_lin = elems(test_name + "_pressure")
 
     # +============+
     # Mesh infrastructure
@@ -192,23 +189,31 @@ def main(test_name, test_type):
     cmfe_mesh = iron.Mesh()
     cmfe_mesh.CreateStart(mesh_n, cmfe_region, DIM)
     cmfe_mesh.NumberOfElementsSet(e_n)
-    cmfe_mesh.NumberOfComponentsSet(1) 
-    # +==+ cmfe mesh elements
-    cmfe_mesh_e = iron.MeshElements()
-    cmfe_mesh_e.CreateStart(cmfe_mesh, 1, cmfe_basis)
+    cmfe_mesh.NumberOfComponentsSet(2) 
+    # +==+ cmfe quadratic mesh elements
+    cmfe_mesh_e_quad = iron.MeshElements()
+    cmfe_mesh_e_quad.CreateStart(cmfe_mesh, 1, cmfe_quad_basis)
     # += allocating nodes to elements
-    print('+= ... begin mesh allocation')
-    gmsh2iron = cvtNodeNumbering("GMSH", "VTK")
+    print('+= ... begin quadratic mesh allocation')
     for i in range(e_n):
-        nodesList = list(
-            map(int,[e_np_map[i][idx] for idx in abc])
+        node_allocs = list(
+            map(int,[e_np_map[i][idx] for idx in GMSH2IRON])
         )
-        # nodesList = list(
-        #     map(int,e_np_map[i][:])
-        # )
-        cmfe_mesh_e.NodesSet(e_idx[i], nodesList)
+        cmfe_mesh_e_quad.NodesSet(e_idx[i], node_allocs)
     # +=
-    cmfe_mesh_e.CreateFinish()
+    cmfe_mesh_e_quad.CreateFinish()
+    # +==+ cmfe linear mesh elements
+    cmfe_mesh_e_lin = iron.MeshElements()
+    cmfe_mesh_e_lin.CreateStart(cmfe_mesh, 2, cmfe_lin_basis)
+    # += allocating nodes to elements
+    print('+= ... begin linear mesh allocation')
+    for i in range(e_n_lin):
+        node_allocs = list(
+            map(int,[e_np_map_lin[i][idx] for idx in GMSH2IRON])
+        )
+        cmfe_mesh_e_lin.NodesSet(e_idx[i], node_allocs)
+    # +=
+    cmfe_mesh_e_lin.CreateFinish()
     cmfe_mesh.CreateFinish()
     print('+==+ MESH ALLOCATION COMPLETE')
     
@@ -349,7 +354,7 @@ def main(test_name, test_type):
     # cmfe & meshio output
     cmfe.vtk_output(
         cmfe_mesh, n_n, cmfe_geo_field, cmfe_dep_field, e_np_map, 
-        cmfe_mesh_e, RUNTIME_PATH, test_name, cvtNodeNumbering("GMSH", "VTK"), test_type
+        cmfe_mesh_e_quad, RUNTIME_PATH, test_name, None, test_type
     )
     print('+==+ EXPORT COMPLETE')
 
@@ -369,7 +374,8 @@ def main(test_name, test_type):
     # cmfe_problem.Destroy()
     cmfe_coord.Destroy()
     cmfe_region.Destroy()
-    cmfe_basis.Destroy()
+    cmfe_quad_basis.Destroy()
+    cmfe_lin_basis.Destroy()
     iron.Finalise()
 
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 

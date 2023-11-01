@@ -58,16 +58,29 @@ def coordinate_setup(coord_n, dim):
 #       -x <- n1 ---- n2 ---- n3 -> x
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
 
-def basis_setup(basis_n, xi_n):
-    basis = iron.Basis()
-    basis.CreateStart(basis_n)
-    basis.TypeSet(iron.BasisTypes.LAGRANGE_HERMITE_TP)
-    basis.NumberOfXiSet(xi_n)
-    basis.InterpolationXiSet(
-        [iron.BasisInterpolationSpecifications.QUADRATIC_LAGRANGE] * xi_n
-    )
-    basis.QuadratureNumberOfGaussXiSet([3]*xi_n)
-    basis.CreateFinish()
+def basis_setup(basis_n, xi_n, type):
+
+    if type == "quadratic":
+        basis = iron.Basis()
+        basis.CreateStart(basis_n)
+        basis.TypeSet(iron.BasisTypes.LAGRANGE_HERMITE_TP)
+        basis.NumberOfXiSet(xi_n)
+        basis.InterpolationXiSet(
+            [iron.BasisInterpolationSpecifications.QUADRATIC_LAGRANGE] * xi_n
+        )
+        basis.QuadratureNumberOfGaussXiSet([3]*xi_n)
+        basis.CreateFinish()
+
+    elif type == "linear":
+        basis = iron.Basis()
+        basis.CreateStart(basis_n)
+        basis.TypeSet(iron.BasisTypes.LAGRANGE_HERMITE_TP)
+        basis.NumberOfXiSet(xi_n)
+        basis.InterpolationXiSet(
+            [iron.BasisInterpolationSpecifications.LINEAR_LAGRANGE] * xi_n
+        )
+        basis.QuadratureNumberOfGaussXiSet([2]*xi_n)
+        basis.CreateFinish()
 
     return basis
 
@@ -183,13 +196,19 @@ def dependent_setup(dep_field_n, region, decomp, geo_field):
     dep_field.NumberOfComponentsSet(iron.FieldVariableTypes.U, 4)
     dep_field.NumberOfComponentsSet(iron.FieldVariableTypes.DELUDELN, 4)
 
+    dep_field.ComponentMeshComponentSet(iron.FieldVariableTypes.U, X, 1)
+    dep_field.ComponentMeshComponentSet(iron.FieldVariableTypes.U, Y, 1) 
+    dep_field.ComponentMeshComponentSet(iron.FieldVariableTypes.U, Z, 1) 
+    dep_field.ComponentMeshComponentSet(iron.FieldVariableTypes.U, P, 2)
+    dep_field.ComponentMeshComponentSet(iron.FieldVariableTypes.DELUDELN, P, 2)
 
     dep_field.ComponentInterpolationSet(
-        iron.FieldVariableTypes.U, 4,
-        iron.FieldInterpolationTypes.ELEMENT_BASED)
+        iron.FieldVariableTypes.U, 4, iron.FieldInterpolationTypes.NODE_BASED
+    )
     dep_field.ComponentInterpolationSet(
-        iron.FieldVariableTypes.DELUDELN, 4,
-        iron.FieldInterpolationTypes.ELEMENT_BASED)
+        iron.FieldVariableTypes.DELUDELN, 4, iron.FieldInterpolationTypes.NODE_BASED
+    )
+    dep_field.ScalingTypeSet(iron.FieldScalingTypes.ARITHMETIC_MEAN) # ??
     dep_field.CreateFinish()
     
     return dep_field
