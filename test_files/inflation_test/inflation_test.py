@@ -95,6 +95,39 @@ IRON_VTK = [
 #     "VTK": [20, 21, 22, 23, 24, 25, 26]
 # }
 
+# Iron Numbering for 27?
+#   *  z = 0       x  z = 1         
+#   *  2------3    x  6------7
+#   *  |      |    x  |      |
+#   *  |      |    x  |      |
+#   *  |      |    x  |      |
+#   *  0------1    x  4------5
+
+# Gmsh Numbering for Hexa-27
+#   *  z = 0       x  z = 1         
+#   *  3------2    x  7------6
+#   *  |      |    x  |      |
+#   *  |      |    x  |      |
+#   *  |      |    x  |      |
+#   *  0------1    x  4------5   
+
+# VTK Numbering for Hexa-27
+#   *  z = 0       x  z = 1         
+#   *  3------2    x  7------6
+#   *  |      |    x  |      |
+#   *  |      |    x  |      |
+#   *  |      |    x  |      |
+#   *  0------1    x  4------5
+
+GMSH2IRON_LIN = [
+    0, 1, 3, 2,
+    4, 5, 7, 6
+]
+IRON2VTK_LIN = [
+    0, 1, 3, 2,
+    4, 5, 7, 6
+]
+
 # Unique user number identifiers
 (
     coord_n, quad_basis_n, lin_basis_n, 
@@ -149,7 +182,7 @@ def elems(test_name):
 # Main function for safe operation of inflation test
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
 
-def main(test_name, test_type):
+def main(test_name, test_type, pressure_test):
 
     # +============+  
     # Base infrastructure
@@ -162,8 +195,6 @@ def main(test_name, test_type):
     # +==+ cmfe basis system
     cmfe_quad_basis = cmfe.basis_setup(quad_basis_n, XI_N, "quadratic")
     print('+==+ QUAD BASIS SYSTEM COMPLETE')
-    cmfe_lin_basis = cmfe.basis_setup(lin_basis_n, XI_N, "linear")
-    print('+==+ LIN BASIS SYSTEM COMPLETE')
     # +==+ cmfe region system
     cmfe_region = cmfe.region_setup(region_n, cmfe_coord)
     print('+==+ REGION COMPLETE')
@@ -174,8 +205,15 @@ def main(test_name, test_type):
 
     n_np_xyz, n_idx, n_n = nodes(test_name)
     e_np_map, e_idx, e_n = elems(test_name)
-    n_np_xyz_lin, n_idx_lin, n_n_lin = nodes(test_name + "_pressure")
-    e_np_map_lin, e_idx_lin, e_n_lin = elems(test_name + "_pressure")
+
+    # +============+  
+    # Pressure Setup
+    # +============+
+    if pressure_test:
+        cmfe_lin_basis = cmfe.basis_setup(lin_basis_n, XI_N, "linear")
+        print('+==+ LIN BASIS SYSTEM COMPLETE')
+        n_np_xyz_lin, n_idx_lin, n_n_lin = nodes(test_name + "_pressure")
+        e_np_map_lin, e_idx_lin, e_n_lin = elems(test_name + "_pressure")
 
     # +============+
     # Mesh infrastructure
@@ -189,7 +227,10 @@ def main(test_name, test_type):
     cmfe_mesh = iron.Mesh()
     cmfe_mesh.CreateStart(mesh_n, cmfe_region, DIM)
     cmfe_mesh.NumberOfElementsSet(e_n)
-    cmfe_mesh.NumberOfComponentsSet(2) 
+    if pressure_test:
+        cmfe_mesh.NumberOfComponentsSet(2) 
+    else:
+        cmfe_mesh.NumberOfComponentsSet(1) 
     # +==+ cmfe quadratic mesh elements
     cmfe_mesh_e_quad = iron.MeshElements()
     cmfe_mesh_e_quad.CreateStart(cmfe_mesh, 1, cmfe_quad_basis)
@@ -202,18 +243,19 @@ def main(test_name, test_type):
         cmfe_mesh_e_quad.NodesSet(e_idx[i], node_allocs)
     # +=
     cmfe_mesh_e_quad.CreateFinish()
-    # +==+ cmfe linear mesh elements
-    cmfe_mesh_e_lin = iron.MeshElements()
-    cmfe_mesh_e_lin.CreateStart(cmfe_mesh, 2, cmfe_lin_basis)
-    # += allocating nodes to elements
-    print('+= ... begin linear mesh allocation')
-    for i in range(e_n_lin):
-        node_allocs = list(
-            map(int,[e_np_map_lin[i][idx] for idx in GMSH2IRON])
-        )
-        cmfe_mesh_e_lin.NodesSet(e_idx[i], node_allocs)
-    # +=
-    cmfe_mesh_e_lin.CreateFinish()
+    if pressure_test:
+        # +==+ cmfe linear mesh elements
+        cmfe_mesh_e_lin = iron.MeshElements()
+        cmfe_mesh_e_lin.CreateStart(cmfe_mesh, 2, cmfe_lin_basis)
+        # += allocating nodes to elements
+        print('+= ... begin linear mesh allocation')
+        for i in range(e_n_lin):
+            node_allocs = list(
+                map(int,[e_np_map_lin[i][idx] for idx in GMSH2IRON_LIN])
+            )
+            cmfe_mesh_e_lin.NodesSet(e_idx_lin[i], node_allocs)
+        # +=
+        cmfe_mesh_e_lin.CreateFinish()
     cmfe_mesh.CreateFinish()
     print('+==+ MESH ALLOCATION COMPLETE')
     
@@ -248,7 +290,7 @@ def main(test_name, test_type):
     cmfe_mat_field = cmfe.material_setup(mat_field_n, cmfe_decomp, cmfe_geo_field, cmfe_region, C_VALS)
     print('+==+ MATERIAL FIELD COMPLETE')
     # +==+ cmfe dependent field
-    cmfe_dep_field = cmfe.dependent_setup(dep_field_n, cmfe_region, cmfe_decomp, cmfe_geo_field)
+    cmfe_dep_field = cmfe.dependent_setup(dep_field_n, cmfe_region, cmfe_decomp, cmfe_geo_field, pressure_test)
     for i in [X, Y, Z]:
         iron.Field.ParametersToFieldParametersComponentCopy(
             cmfe_geo_field, iron.FieldVariableTypes.U, iron.FieldParameterSetTypes.VALUES, i,
@@ -388,8 +430,13 @@ if __name__ == '__main__':
     argparser = argparse.ArgumentParser("A python program to run inflation tests in OpenCMISS Iron.")
     argparser.add_argument("test_file")
     argparser.add_argument("test_type")
+    argparser.add_argument("pressure_test")
     args = argparser.parse_args()
     test_name = args.test_file
     type_name = args.test_type
+    pressure_test = args.pressure_test
 
-    main(test_name, type_name)
+    if pressure_test == "False":
+        main(test_name, type_name, False)
+    else:
+        main(test_name, type_name, True)

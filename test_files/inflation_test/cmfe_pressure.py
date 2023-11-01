@@ -28,6 +28,16 @@ GMSH2VTK = [
     20, 25, 26
 ]
 
+GMSH2IRON_LIN = [
+    0, 1, 3, 2,
+    4, 5, 7, 6
+]
+IRON2VTK_LIN = [
+    0, 1, 3, 2,
+    4, 5, 7, 6
+]
+
+
 EXTENSION_TEST = False
 PRESSURE_TEST = True
 INNER_RAD = 1
@@ -184,7 +194,7 @@ def material_setup(mat_field_n, decomp, geo_field, region, c):
 #       ELEMENT_BASED for pressure, meaning it is per element. 
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
 
-def dependent_setup(dep_field_n, region, decomp, geo_field):
+def dependent_setup(dep_field_n, region, decomp, geo_field, pressure_test):
     dep_field = iron.Field()
     dep_field.CreateStart(dep_field_n, region)
     dep_field.MeshDecompositionSet(decomp)
@@ -196,19 +206,28 @@ def dependent_setup(dep_field_n, region, decomp, geo_field):
     dep_field.NumberOfComponentsSet(iron.FieldVariableTypes.U, 4)
     dep_field.NumberOfComponentsSet(iron.FieldVariableTypes.DELUDELN, 4)
 
-    dep_field.ComponentMeshComponentSet(iron.FieldVariableTypes.U, X, 1)
-    dep_field.ComponentMeshComponentSet(iron.FieldVariableTypes.U, Y, 1) 
-    dep_field.ComponentMeshComponentSet(iron.FieldVariableTypes.U, Z, 1) 
-    dep_field.ComponentMeshComponentSet(iron.FieldVariableTypes.U, P, 2)
-    dep_field.ComponentMeshComponentSet(iron.FieldVariableTypes.DELUDELN, P, 2)
+    if pressure_test:
+        dep_field.ComponentMeshComponentSet(iron.FieldVariableTypes.U, X, 1)
+        dep_field.ComponentMeshComponentSet(iron.FieldVariableTypes.U, Y, 1) 
+        dep_field.ComponentMeshComponentSet(iron.FieldVariableTypes.U, Z, 1) 
+        dep_field.ComponentMeshComponentSet(iron.FieldVariableTypes.U, P, 2)
+        dep_field.ComponentMeshComponentSet(iron.FieldVariableTypes.DELUDELN, P, 2)
+        dep_field.ComponentInterpolationSet(
+            iron.FieldVariableTypes.U, 4, iron.FieldInterpolationTypes.NODE_BASED
+        )
+        dep_field.ComponentInterpolationSet(
+            iron.FieldVariableTypes.DELUDELN, 4, iron.FieldInterpolationTypes.NODE_BASED
+        )
+        dep_field.ScalingTypeSet(iron.FieldScalingTypes.ARITHMETIC_MEAN) # ??
 
-    dep_field.ComponentInterpolationSet(
-        iron.FieldVariableTypes.U, 4, iron.FieldInterpolationTypes.NODE_BASED
-    )
-    dep_field.ComponentInterpolationSet(
-        iron.FieldVariableTypes.DELUDELN, 4, iron.FieldInterpolationTypes.NODE_BASED
-    )
-    dep_field.ScalingTypeSet(iron.FieldScalingTypes.ARITHMETIC_MEAN) # ??
+    else:
+        dep_field.ComponentInterpolationSet(
+            iron.FieldVariableTypes.U, 4, iron.FieldInterpolationTypes.ELEMENT_BASED
+        )
+        dep_field.ComponentInterpolationSet(
+            iron.FieldVariableTypes.DELUDELN, 4, iron.FieldInterpolationTypes.ELEMENT_BASED
+        )
+
     dep_field.CreateFinish()
     
     return dep_field
@@ -520,7 +539,7 @@ def vtk_output(mesh, n_n, geo_field, dep_field, e_np_map, mesh_e, runtime_path, 
     e_list_gmsh = np.array(e_list)[:,:] - 1
     e_list_vtk = e_list_gmsh[:, GMSH2VTK]
     meshio.write_points_cells(
-        "docker-iron/test_files/inflation_test/vtk_files" + test_name + test_type + ".vtk", 
+        "docker-iron/test_files/inflation_test/vtk_files/" + test_name + test_type + ".vtk", 
         bef_def, 
         [("hexahedron27", e_list_vtk)] + [("hexahedron27", e_list_vtk)], 
         {"deformed": aft_def}
