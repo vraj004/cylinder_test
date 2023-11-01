@@ -29,7 +29,7 @@ PRESSURE_NODE = True
 LOADSTEPS = 1
 INNER_RAD = 0.375
 C_VALS = [2, 6]
-PRESSURE_VAL = -1
+PRESSURE_VAL = 10
 TRANSLATION_VAL = 0.02
 RUNTIME_PATH = "/home/jovyan/work/docker-iron/test_files/inflation_test/runtime_files/"
 
@@ -249,11 +249,11 @@ def main(test_name, test_type, pressure_test):
         cmfe_mesh_e_lin.CreateStart(cmfe_mesh, 2, cmfe_lin_basis)
         # += allocating nodes to elements
         print('+= ... begin linear mesh allocation')
-        for i in range(e_n_lin):
+        for i in range(e_n):
             node_allocs = list(
-                map(int,[e_np_map_lin[i][idx] for idx in GMSH2IRON_LIN])
+                map(int,[e_np_map[i][idx] for idx in GMSH2IRON_LIN])
             )
-            cmfe_mesh_e_lin.NodesSet(e_idx_lin[i], node_allocs)
+            cmfe_mesh_e_lin.NodesSet(e_idx[i], node_allocs)
         # +=
         cmfe_mesh_e_lin.CreateFinish()
     cmfe_mesh.CreateFinish()
@@ -371,7 +371,7 @@ def main(test_name, test_type, pressure_test):
     cmfe_def_field = cmfe.deformed_setup(def_field_n, cmfe_region, cmfe_decomp, cmfe_dep_field)
     print('+==+ DEFORMED FIELD COMPLETE')
     # +==+ cmfe pressure field
-    cmfe_pre_field = cmfe.pressure_setup(cmfe_region, cmfe_decomp, pre_field_n)
+    cmfe_pre_field = cmfe.pressure_setup(cmfe_region, cmfe_decomp, pre_field_n, pressure_test)
     print('+==+ PRESSURE FIELD COMPLETE')
     # += setup deformed field with new values
     print('+= ... begin deformed mesh setup')
@@ -404,20 +404,19 @@ def main(test_name, test_type, pressure_test):
     # Wrap it up
     # +============+ 
 
-    results = {}
-    elementNumber = 1
-    p = cmfe_dep_field.ParameterSetGetElement(
-    iron.FieldVariableTypes.U,
-    iron.FieldParameterSetTypes.VALUES,elementNumber,4)
-    results['Hydrostatic pressure'] = p
-    print("Hydrostatic pressure")
-    print(p)
+    # results = {}
+    # elementNumber = 1
+    # p = cmfe_dep_field.ParameterSetGetElement(
+    # iron.FieldVariableTypes.U,
+    # iron.FieldParameterSetTypes.VALUES,elementNumber,4)
+    # results['Hydrostatic pressure'] = p
+    # print("Hydrostatic pressure")
+    # print(p)
 
     # cmfe_problem.Destroy()
     cmfe_coord.Destroy()
     cmfe_region.Destroy()
     cmfe_quad_basis.Destroy()
-    cmfe_lin_basis.Destroy()
     iron.Finalise()
 
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 

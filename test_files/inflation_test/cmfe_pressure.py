@@ -89,7 +89,7 @@ def basis_setup(basis_n, xi_n, type):
         basis.InterpolationXiSet(
             [iron.BasisInterpolationSpecifications.LINEAR_LAGRANGE] * xi_n
         )
-        basis.QuadratureNumberOfGaussXiSet([2]*xi_n)
+        basis.QuadratureNumberOfGaussXiSet([3]*xi_n)
         basis.CreateFinish()
 
     return basis
@@ -362,30 +362,30 @@ def boundary_conditions_setup(solver_eqs, dep_field, n_n, n_np_xyz, pre, tra):
 #                     pre
 #                 )
 #                 print(i, conditions, x, y, z)
-            if x == 0 and (y == 0.25 or y == 0.5 or y == 0.75):
-                bcs.AddNode(dep_field, 
-                    iron.FieldVariableTypes.DELUDELN, 1, 1, i+1, Z,
-                    iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED, 
-                    pre
-                )
-            if z == min_z or x == 1:
-                for j in [X, Y, Z]:
-                    bcs.AddNode(
-                        dep_field, 
-                        iron.FieldVariableTypes.U,
-                        1, 1, i+1, j,
-                        iron.BoundaryConditionsTypes.FIXED,
-                        0.0
-                    )
-            if z == max_z:
-                for j in [Z]:
-                    bcs.AddNode(
-                        dep_field, 
-                        iron.FieldVariableTypes.U,
-                        1, 1, i+1, j,
-                        iron.BoundaryConditionsTypes.FIXED,
-                        0.0
-                    )
+            # if i == 102: #x == 0 and (y == 0.25): # or y == 0.5 or y == 0.75):
+            #     bcs.AddNode(dep_field, 
+            #         iron.FieldVariableTypes.DELUDELN, 1, 1, i+1, Z,
+            #         iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED, 
+            #         pre
+            #     )
+            # if z == min_z or x == 1:
+            #     for j in [X, Y, Z]:
+            #         bcs.AddNode(
+            #             dep_field, 
+            #             iron.FieldVariableTypes.U,
+            #             1, 1, i+1, j,
+            #             iron.BoundaryConditionsTypes.FIXED,
+            #             0.0
+            #         )
+            # if z == max_z:
+            #     for j in [Z]:
+            #         bcs.AddNode(
+            #             dep_field, 
+            #             iron.FieldVariableTypes.U,
+            #             1, 1, i+1, j,
+            #             iron.BoundaryConditionsTypes.FIXED,
+            #             0.0
+            #         )
 #             if np.isclose(vec_norm, OUTER_RAD, 1e-5) and np.isclose(np.min(n_np_xyz[:, 2]), n_np_xyz[i, 2], 1e-3): 
 #                 for j in [Z]:
 #                     bcs.AddNode(
@@ -441,18 +441,30 @@ def deformed_setup(def_field_n, region, decomp, dep_field):
 #    
 # +==+ ^\_/^ +==+ ^\_/^ +==+ 
 
-def pressure_setup(region, decomp, pre_field_n):
+def pressure_setup(region, decomp, pre_field_n, pressure_test):
     pre_field = iron.Field()
     pre_field.CreateStart(pre_field_n, region)
     pre_field.MeshDecompositionSet(decomp)
     pre_field.VariableLabelSet(iron.FieldVariableTypes.U, "Pressure")
-    pre_field.ComponentMeshComponentSet(iron.FieldVariableTypes.U, 1, 1)
-    pre_field.ComponentInterpolationSet(
-        iron.FieldVariableTypes.U, 
-        1, 
-        iron.FieldInterpolationTypes.ELEMENT_BASED
-    )
-    pre_field.NumberOfComponentsSet(iron.FieldVariableTypes.U, 1)
+
+    if pressure_test:
+        pre_field.ComponentMeshComponentSet(iron.FieldVariableTypes.U, 1, 2)
+        pre_field.ComponentInterpolationSet(
+            iron.FieldVariableTypes.U, 
+            1, 
+            iron.FieldInterpolationTypes.NODE_BASED
+        )
+        pre_field.NumberOfComponentsSet(iron.FieldVariableTypes.U, 1)
+
+    else:
+        pre_field.ComponentMeshComponentSet(iron.FieldVariableTypes.U, 1, 1)
+        pre_field.ComponentInterpolationSet(
+            iron.FieldVariableTypes.U, 
+            1, 
+            iron.FieldInterpolationTypes.ELEMENT_BASED
+        )
+        pre_field.NumberOfComponentsSet(iron.FieldVariableTypes.U, 1)
+
     pre_field.CreateFinish()
     return pre_field
 
@@ -539,9 +551,9 @@ def vtk_output(mesh, n_n, geo_field, dep_field, e_np_map, mesh_e, runtime_path, 
     e_list_gmsh = np.array(e_list)[:,:] - 1
     e_list_vtk = e_list_gmsh[:, GMSH2VTK]
     meshio.write_points_cells(
-        "docker-iron/test_files/inflation_test/vtk_files/" + test_name + test_type + ".vtk", 
+        "vtk_files/" + test_name + test_type + ".vtk", 
         bef_def, 
         [("hexahedron27", e_list_vtk)] + [("hexahedron27", e_list_vtk)], 
         {"deformed": aft_def}
     )
-    return
+    return 
