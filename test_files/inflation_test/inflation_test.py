@@ -29,9 +29,9 @@ PRESSURE_NODE = True
 LOADSTEPS = 1
 INNER_RAD = 0.375
 C_VALS = [2, 6]
-PRESSURE_VAL = 10
-TRANSLATION_VAL = 0.02
-RUNTIME_PATH = "/home/jovyan/work/docker-iron/test_files/inflation_test/runtime_files/"
+PRESSURE_VAL = 0.0
+TRANSLATION_VAL = 0.0
+RUNTIME_PATH = "/home/jovyan/work/vraj004/cylinder_test/test_files/inflation_test/runtime_files/"
 
 # Iron Numbering for 27?
 #   *  z = 0           z = 0.5         z = 1          
@@ -297,7 +297,7 @@ def main(test_name, test_type, pressure_test):
             cmfe_dep_field, iron.FieldVariableTypes.U, iron.FieldParameterSetTypes.VALUES, i
         )
     iron.Field.ComponentValuesInitialiseDP(
-        cmfe_dep_field, iron.FieldVariableTypes.U, iron.FieldParameterSetTypes.VALUES, P, 0.0
+        cmfe_dep_field, iron.FieldVariableTypes.U, iron.FieldParameterSetTypes.VALUES, P, -8.0
     )
     print('+==+ DEPENDENT FIELD COMPLETE')
 
