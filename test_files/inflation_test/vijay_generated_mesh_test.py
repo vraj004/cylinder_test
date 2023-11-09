@@ -56,8 +56,10 @@ import sys, os
 
 # Intialise OpenCMISS
 from opencmiss.iron import iron
+import math
 import numpy as np
 import meshio
+
 # Set problem parameters
 def vtkoutput(totalNumberOfNodes, totalNumberOfElements, mesh,geo_field,dep_field):
     X = 1
@@ -174,7 +176,7 @@ numberGlobalZElements=1
 # Set all diganostic levels on for testing
 iron.DiagnosticsSetOn(iron.DiagnosticTypes.ALL,[1,2,3,4,5],"Diagnostics",["DOMAIN_MAPPINGS_LOCAL_FROM_GLOBAL_CALCULATE"])
 
-totalNumberOfNodes=16
+totalNumberOfNodes=72
 totalNumberOfElements=4
 InterpolationType = 1
 if(UsePressureBasis):
@@ -211,7 +213,7 @@ if InterpolationType in (1,2,3,4):
 elif InterpolationType in (7,8,9):
     basis.type = iron.BasisTypes.SIMPLEX
 basis.numberOfXi = numberOfXi
-basis.interpolationXi = [iron.BasisInterpolationSpecifications.LINEAR_LAGRANGE]*numberOfXi
+basis.interpolationXi = [iron.BasisInterpolationSpecifications.QUADRATIC_LAGRANGE]*numberOfXi
 if(NumberOfGaussXi>0):
     basis.quadratureNumberOfGaussXi = [NumberOfGaussXi]*numberOfXi
 basis.CreateFinish()
@@ -240,17 +242,51 @@ mesh.NumberOfElementsSet(totalNumberOfElements)
 nodes = iron.Nodes()
 nodes.CreateStart(region,totalNumberOfNodes)
 nodes.CreateFinish()
-
+#create list of nodes and their coordinates in the order you are going to define the elements. This will make element definition easier
+node_list = []
+elem_theta_delta = math.pi/2.0
+theta_delta = math.pi/4.0
+xorig = 0.0
+yorig = 0.0
+zorig = 0.0
+theta_orig=2*math.pi
+r_inner = 1.0
+r_outer = 1.5
+r_delta = (r_outer-r_inner)/2.0
+r_mid = r_inner+r_delta
+z_delta = 0.5
+for ridx in range(0,3,1):
+    r = r_inner+ridx*r_delta
+    for thetaidx in range(0,8,1):
+        theta = theta_orig-thetaidx*theta_delta
+        for zidx in range(0,3,1):
+            z = zorig+zidx*z_delta
+            node_list.append(
+                [
+                    xorig+r*math.cos(theta),
+                    yorig+r*math.sin(theta),
+                    zorig+z
+                ]
+            )
+nodesPerR = 24
+# Define the element connectivity
 elements = iron.MeshElements()
 meshComponentNumber=1
-
 elements.CreateStart(mesh,meshComponentNumber,basis)
-elements.NodesSet(1,[1,2,3,4,5,6,7,8])
-elements.NodesSet(2,[9, 10, 1,2, 11, 12, 5, 6])
-elements.NodesSet(3,[13,14,9,10,15,16,11,12])
-elements.NodesSet(4,[3,4,13,14,7,8,15,16])
-elements.CreateFinish()
 
+elem_node_list.append(1,2,3,4,5,6,7,8,9,25,26,27,28,29,30,31,32,33,49,50,51,52,53,54,55,56,57)
+elem_node_list.append(7,8,9,10,11,12,13,14,15,31,32,33,34,35,36,37,38,39,55,56,57,58,59,60,61,62,63)
+elem_node_list.append(13,14,15,16,17,18,19,20,21,37,38,39,40,41,42,43,44,45,61,62,63,64,65,66,67,68,69)
+elem_node_list.append(19,20,21,22,23,24,1,2,3,43,44,45,46,47,48,25,26,27,67,68,69,70,71,72,49,50,51)
+elements.NodesSet(1, elem_node_list[0])
+elements.NodesSet(2, elem_node_list[1])
+elements.NodesSet(3, elem_node_list[2])
+elements.NodesSet(4, elem_node_list[3])
+
+mesh.ElementsSet(elemidx+1,iron.ElementsQuadrilateral,elem_node_list)
+
+
+elements.CreateFinish()
 mesh.CreateFinish() 
 
 # Create a decomposition for the mesh
@@ -503,12 +539,12 @@ boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.U,1,1,13,3,iro
 boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.U,1,1,15,3,iron.BoundaryConditionsTypes.FIXED,0.0)
 
 #Pressure boundary conditions on the internal faces.
-boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.DELUDELN,1,1,1,3,iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED,0.0)
-boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.DELUDELN,1,1,2,3,iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED,0.0)
+boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.DELUDELN,1,1,1,3,iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED,10.0)
+boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.DELUDELN,1,1,2,3,iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED,10.0)
 #boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.DELUDELN,1,1,3,3,iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED,0.5)
 #boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.DELUDELN,1,1,4,3,iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED,0.5)
-boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.DELUDELN,1,1,9,3,iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED,0.0)
-boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.DELUDELN,1,1,10,3,iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED,0.0)
+boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.DELUDELN,1,1,9,3,iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED,10.0)
+boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.DELUDELN,1,1,10,3,iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED,10.0)
 #boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.DELUDELN,1,1,13,3,iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED,0.0)
 #boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.DELUDELN,1,1,14,3,iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED,0.0)
 
