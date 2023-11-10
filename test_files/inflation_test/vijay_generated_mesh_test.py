@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 #> \file
-#> \author Chris Bradley
+#> \author Vijay Rajagopal, Liam Murray
 #> \brief This is an example script to solve a finite elasticity equation using OpenCMISS calls in python.
 #>
 #> \section LICENSE
@@ -59,8 +59,10 @@ from opencmiss.iron import iron
 import math
 import numpy as np
 import meshio
+import generateMesh
 
-# Set problem parameters
+
+#Setting up the vtk output function before use after solve.
 def vtkoutput(totalNumberOfNodes, totalNumberOfElements, mesh,geo_field,dep_field):
     X = 1
     Y = 2
@@ -201,12 +203,36 @@ def vtkoutput(totalNumberOfNodes, totalNumberOfElements, mesh,geo_field,dep_fiel
 
     return
 
+# Set problem parameters
+#cylinder geometry inputs
+r_inner = 1.0
+r_outer = 1.5
+z_length = 1.0
+#material parameters
+c10 = 2.0
+c01 = 6.0
+#loading conditions
+pressure_internal = 5.0
+pressure_external = -1.0
+stretch_ratio = 0.8
+twist_angle = 0.0 #math.pi/6.0  #in radians
+#mesh parameters
+#set number of elements in each direction of cylinder.
+numberOfRadialElements = 1
+numberOfCircumferentialElements = 4
+numberOfZElements = 1
+#set geometric basis interpolation to one of:
+# 1 - linear lagrange
+# 2 - quadratic lagrange
+InterpolationType = 2
+#decide if you want to use a pressure basis for the pressure field
 UsePressureBasis = False
-NumberOfGaussXi = 4
+#From here the code sets up the problem with the inputs from above.
 
+# Set OpenCMISS parameters
 coordinateSystemUserNumber = 1
 regionUserNumber = 1
-basisUserNumber = 1
+geometricbasisUserNumber = 1
 pressureBasisUserNumber = 2
 generatedMeshUserNumber = 1
 meshUserNumber = 1
@@ -218,19 +244,8 @@ dependentFieldUserNumber = 4
 equationsSetUserNumber = 1
 equationsSetFieldUserNumber = 5
 problemUserNumber = 1
-numberGlobalZElements=1
 
-totalNumberOfNodes=72
-totalNumberOfElements=4
-InterpolationType = 1
-if(UsePressureBasis):
-  numberOfMeshComponents = 2
-else:
-  numberOfMeshComponents = 1
-if(numberGlobalZElements==0):
-    numberOfXi = 2
-else:
-    numberOfXi = 3
+
 
 # Get the number of computational nodes and this computational node number
 numberOfComputationalNodes = iron.ComputationalNumberOfNodesGet()
@@ -249,18 +264,43 @@ region.LabelSet("Region")
 region.coordinateSystem = coordinateSystem
 region.CreateFinish()
 
-# Define basis
-basis = iron.Basis()
-basis.CreateStart(basisUserNumber)
+# Define bases
+
+#setting up basis function related settings and accordingly number of nodes and number of elements.
+if(InterpolationType==2):
+    totalNumberOfElements = numberOfRadialElements*numberOfCircumferentialElements*numberOfZElements
+    if InterpolationType==1:
+        totalNumberOfNodes = 8*totalNumberOfElements-(4*totalNumberOfElements)
+    elif InterpolationType==2:
+        totalNumberOfNodes = 27*totalNumberOfElements-(9*totalNumberOfElements)
+if(UsePressureBasis):
+    numberOfMeshComponents = 2
+    if InterpolationType==1:
+        totalNumberOfPressureNodes = 8*totalNumberOfElements-(4*totalNumberOfElements)
+    elif (InterpolationType==2):
+        print("Using quadratic lagrange pressure basis is not supported, please change to linear interpolation or no pressure basis (only element varying)")
+        exit()
+else:
+    numberOfMeshComponents = 1
+
+#hard coding two parameters because the cylinder is 3D and lower number of gauss points per xi direction than 4 leads to significant model simulation errors.
+numberOfXi = 3
+NumberOfGaussXi = 4
+
+geometricBasis = iron.Basis()
+geometricBasis.CreateStart(geometricbasisUserNumber)
 if InterpolationType in (1,2,3,4):
-    basis.type = iron.BasisTypes.LAGRANGE_HERMITE_TP
+    geometricBasis.type = iron.BasisTypes.LAGRANGE_HERMITE_TP
 elif InterpolationType in (7,8,9):
-    basis.type = iron.BasisTypes.SIMPLEX
-basis.numberOfXi = numberOfXi
-basis.interpolationXi = [iron.BasisInterpolationSpecifications.QUADRATIC_LAGRANGE]*numberOfXi
-if(NumberOfGaussXi>0):
-    basis.quadratureNumberOfGaussXi = [NumberOfGaussXi]*numberOfXi
-basis.CreateFinish()
+    geometricBasis.type = iron.BasisTypes.SIMPLEX
+geometricBasis.numberOfXi = numberOfXi
+if (InterpolationType==1):
+    geometricBasis.interpolationXi = [iron.BasisInterpolationSpecifications.LINEAR_LAGRANGE]*numberOfXi
+elif (InterpolationType==2):
+    geometricBasis.interpolationXi = [iron.BasisInterpolationSpecifications.QUADRATIC_LAGRANGE]*numberOfXi
+
+geometricBasis.quadratureNumberOfGaussXi = [NumberOfGaussXi]*numberOfXi
+geometricBasis.CreateFinish()
 
 if(UsePressureBasis):
     # Define pressure basis
@@ -271,7 +311,11 @@ if(UsePressureBasis):
     elif InterpolationType in (7,8,9):
         pressureBasis.type = iron.BasisTypes.SIMPLEX
     pressureBasis.numberOfXi = numberOfXi
-    pressureBasis.interpolationXi = [iron.BasisInterpolationSpecifications.LINEAR_LAGRANGE]*numberOfXi
+    if InterpolationType==1:
+        pressureBasis.interpolationXi = [iron.BasisInterpolationSpecifications.LINEAR_LAGRANGE]*numberOfXi
+    elif InterpolationType==2: #this should be unnecessary because i have caught this case above
+        print("Using quadratic lagrange pressure basis is not supported, please change to linear interpolation or no pressure basis (only element varying)")
+        exit()
     if(NumberOfGaussXi>0):
         pressureBasis.quadratureNumberOfGaussXi = [NumberOfGaussXi]*numberOfXi
     pressureBasis.CreateFinish()
@@ -286,53 +330,7 @@ mesh.NumberOfElementsSet(totalNumberOfElements)
 nodes = iron.Nodes()
 nodes.CreateStart(region,totalNumberOfNodes)
 nodes.CreateFinish()
-#create list of nodes and their coordinates in the order you are going to define the elements. This will make element definition easier
-node_list = []
-node_idx=0
-node_idx_list=[]
-bottom_node_list = []
-yfix_node_list = []
-xfix_node_list = []
-internal_node_list = []
-elem_theta_delta = math.pi/2.0
-theta_delta = math.pi/4.0
-xorig = 0.0
-yorig = 0.0
-zorig = 0.0
-theta_orig=2*math.pi
-r_inner = 1.0
-r_outer = 1.5
-r_delta = (r_outer-r_inner)/2.0
-r_mid = r_inner+r_delta
-z_delta = 0.5
-for ridx in range(0,3,1):
-    r = r_inner+ridx*r_delta
-    print(r)
-    for thetaidx in range(0,8,1):
-        theta = theta_orig-thetaidx*theta_delta
-
-        for zidx in range(0,3,1):
-            z = zorig+zidx*z_delta
-            node_list.append(
-                [
-                    xorig+r*math.cos(theta),
-                    yorig+r*math.sin(theta),
-                    zorig+z
-                ]
-            )
-            node_idx=node_idx+1
-            node_idx_list.append([node_idx])
-
-            if(thetaidx==0 or thetaidx==4):
-                yfix_node_list.append([node_idx])
-            if(zidx==0):
-                bottom_node_list.append([node_idx])
-            if(thetaidx==2 or thetaidx==6):
-                xfix_node_list.append([node_idx])
-            if(ridx==0):
-                internal_node_list.append([node_idx])
-print(len(node_list))
-nodesPerR = 24
+node_list, node_idx_list, top_node_list,bottom_node_list, yfix_node_list, xfix_node_list, internal_node_list,outer_node_list = generateMesh.annulus(r_inner, r_outer, z_length, numberOfRadialElements, numberOfCircumferentialElements, numberOfZElements, InterpolationType)
 
 els = [
     list(range(1, 1+9, 1)) + list(range(25, 25+9, 1)) + list(range(49, 49+9, 1)),
@@ -345,7 +343,7 @@ els = [
 elements = iron.MeshElements()
 elem_node_list = []
 meshComponentNumber=1
-elements.CreateStart(mesh,meshComponentNumber,basis)
+elements.CreateStart(mesh,meshComponentNumber,geometricBasis)
 elements.NodesSet(1, els[0])
 elements.NodesSet(2, els[1])
 elements.NodesSet(3, els[2])
@@ -417,9 +415,9 @@ materialField.CreateFinish()
 
 # Set Mooney-Rivlin constants c10 and c01 respectively.
 iron.Field.ComponentValuesInitialiseDP(
-    materialField,iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,2.0)
+    materialField,iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,c01)
 iron.Field.ComponentValuesInitialiseDP(
-    materialField,iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,2,6.0)
+    materialField,iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,2,c10)
 
 # Create the dependent field
 dependentField = iron.Field()
@@ -539,9 +537,19 @@ for nodeidx in range(0,len(xfix_node_list),1):
 #Pressure boundary conditions on the internal faces.
 for nodeidx in range(0,len(internal_node_list),1):
     nodeNum = internal_node_list[nodeidx][0]
-    boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.DELUDELN,1,1,nodeNum,3,iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED,1.0)
+    boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.DELUDELN,1,1,nodeNum,3,iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED,pressure_internal)
+
+#Pressure boundary conditions on the external faces.
+for nodeidx in range(0,len(outer_node_list),1):
+    nodeNum = outer_node_list[nodeidx][0]
+    boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.DELUDELN,1,1,nodeNum,3,iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED,pressure_external)
 
 
+#Apply stretch boundary condition on top faces.
+for nodeidx in range(0,len(top_node_list),1):
+    nodeNum = top_node_list[nodeidx][0]
+    stretch_disp = stretch_ratio*z_length-z_length
+    boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.U,1,1,nodeNum,3,iron.BoundaryConditionsTypes.FIXED_INCREMENTED,stretch_disp)
 
 solverEquations.BoundaryConditionsCreateFinish()
 
