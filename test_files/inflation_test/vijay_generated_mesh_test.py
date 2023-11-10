@@ -90,6 +90,8 @@ def vtkoutput(totalNumberOfNodes, totalNumberOfElements, mesh,geo_field,dep_fiel
                 )
             ]
         )
+
+
         n_aft.append(
             [
                 dep_field.ParameterSetGetNodeDP(
@@ -121,14 +123,57 @@ def vtkoutput(totalNumberOfNodes, totalNumberOfElements, mesh,geo_field,dep_fiel
     # +============+
 
     e_list = []
-    e_list.append([1, 2, 3, 4, 5, 6, 7, 8])
-    e_list.append([9, 10, 1, 2, 11, 12, 5, 6])
-    e_list.append([13, 14, 9, 10, 15, 16, 11, 12])
-    e_list.append([3, 4, 13, 14, 7, 8, 15, 16])
+    e_list.append(
+        [1, 2, 3, 4, 5, 6, 7, 8, 9, 25, 26, 27, 28, 29, 30, 31, 32, 33, 49, 50, 51, 52, 53, 54, 55, 56, 57])
+    e_list.append(
+        [7, 8, 9, 10, 11, 12, 13, 14, 15, 31, 32, 33, 34, 35, 36, 37, 38, 39, 55, 56, 57, 58, 59, 60, 61, 62, 63])
+    e_list.append(
+        [13, 14, 15, 16, 17, 18, 19, 20, 21, 37, 38, 39, 40, 41, 42, 43, 44, 45, 61, 62, 63, 64, 65, 66, 67, 68, 69])
+    e_list.append(
+        [19, 20, 21, 22, 23, 24, 1, 2, 3, 43, 44, 45, 46, 47, 48, 25, 26, 27, 67, 68, 69, 70, 71, 72, 49, 50, 51])
 
     e_list_iron = np.array(e_list)[:,:]-1
-    e_list_vtk = e_list_iron[:, [0, 1, 3, 2,4, 5, 7, 6]]
-    print(e_list_vtk)
+
+
+    # Iron Numbering for 27?
+    #   *  z = 0           z = 0.5         z = 1          
+    #   *  6--7 --8     * 15--16--17    x 24--25--26
+    #   *  |      |     *  |      |     x  |      |
+    #   *  3  4   5     * 12  13  14    x 21  22  23
+    #   *  |      |     *  |      |     x  |      |
+    #   *  0--1 --2     *  9--10--11    x 18--19--20
+
+    # Vijay Numbering for Hexa-27
+    #   *  z = 0           z = 0.5         z = 1    
+    #   *  0-- 9--18    *  1--10--19    *  2--11--20     
+    #   *  |      |     *  |      |     *  |      |       
+    #   *  3  12  21    *  4  13  22    *  5  14  23     
+    #   *  |      |     *  |      |     *  |      |     
+    #   *  6--15--24    *  7--16--25    *  8--17--26      
+
+    # VTK Numbering for Hexa-27
+    #   *  z = 0           z = 0.5         z = 1    
+    #   *  3--10--2     * 19--23--18    x  7--14--6
+    #   *  |      |     *  |      |     x  |      |
+    #   * 11  24  9     * 20  26  21    x 15  25  13
+    #   *  |      |     *  |      |     x  |      |
+    #   *  0-- 8--1     * 16--22--17    x  4--12--5 
+
+    # IRON_VTK = [
+    #     0, 2, 8, 6, 18, 20, 26, 24, 
+    #     1, 5, 7, 3, 19, 13, 25, 21, 
+    #     9, 11, 17, 15, 12, 14, 10, 16, 
+    #     4, 22, 13
+    # ]
+
+    VIJAY_VTK = [
+        6, 24, 18, 0, 8, 26, 20, 2, 
+        15, 21, 9, 3, 17, 23, 11, 5, 
+        7, 25, 19, 1, 4, 22, 16, 10, 
+        12, 14, 13
+    ]
+
+    e_list_vtk = e_list_iron[:, VIJAY_VTK]
 
     # +============+
     # Store data files
@@ -150,13 +195,14 @@ def vtkoutput(totalNumberOfNodes, totalNumberOfElements, mesh,geo_field,dep_fiel
     meshio.write_points_cells(
         "output.vtk",
         bef_def,
-        [("hexahedron", e_list_vtk)] + [("hexahedron", e_list_vtk)],
+        [("hexahedron27", e_list_vtk)] + [("hexahedron27", e_list_vtk)],
         {"deformed": aft_def-bef_def}
     )
 
     return
+
 UsePressureBasis = False
-NumberOfGaussXi = 2
+NumberOfGaussXi = 4
 
 coordinateSystemUserNumber = 1
 regionUserNumber = 1
@@ -173,8 +219,6 @@ equationsSetUserNumber = 1
 equationsSetFieldUserNumber = 5
 problemUserNumber = 1
 numberGlobalZElements=1
-# Set all diganostic levels on for testing
-iron.DiagnosticsSetOn(iron.DiagnosticTypes.ALL,[1,2,3,4,5],"Diagnostics",["DOMAIN_MAPPINGS_LOCAL_FROM_GLOBAL_CALCULATE"])
 
 totalNumberOfNodes=72
 totalNumberOfElements=4
@@ -244,6 +288,12 @@ nodes.CreateStart(region,totalNumberOfNodes)
 nodes.CreateFinish()
 #create list of nodes and their coordinates in the order you are going to define the elements. This will make element definition easier
 node_list = []
+node_idx=0
+node_idx_list=[]
+bottom_node_list = []
+yfix_node_list = []
+xfix_node_list = []
+internal_node_list = []
 elem_theta_delta = math.pi/2.0
 theta_delta = math.pi/4.0
 xorig = 0.0
@@ -257,8 +307,10 @@ r_mid = r_inner+r_delta
 z_delta = 0.5
 for ridx in range(0,3,1):
     r = r_inner+ridx*r_delta
+    print(r)
     for thetaidx in range(0,8,1):
         theta = theta_orig-thetaidx*theta_delta
+
         for zidx in range(0,3,1):
             z = zorig+zidx*z_delta
             node_list.append(
@@ -268,24 +320,36 @@ for ridx in range(0,3,1):
                     zorig+z
                 ]
             )
+            node_idx=node_idx+1
+            node_idx_list.append([node_idx])
+
+            if(thetaidx==0 or thetaidx==4):
+                yfix_node_list.append([node_idx])
+            if(zidx==0):
+                bottom_node_list.append([node_idx])
+            if(thetaidx==2 or thetaidx==6):
+                xfix_node_list.append([node_idx])
+            if(ridx==0):
+                internal_node_list.append([node_idx])
+print(len(node_list))
 nodesPerR = 24
+
+els = [
+    list(range(1, 1+9, 1)) + list(range(25, 25+9, 1)) + list(range(49, 49+9, 1)),
+    list(range(7, 7+9, 1)) + list(range(31, 31+9, 1)) + list(range(55, 55+9, 1)),
+    list(range(13, 13+9, 1)) + list(range(37, 37+9, 1)) + list(range(61, 61+9, 1)),
+    [19, 20, 21, 22, 23, 24, 1, 2, 3] + [43, 44, 45, 46, 47, 48, 25, 26, 27] + [67, 68, 69, 70, 71, 72, 49, 50, 51]
+]
+
 # Define the element connectivity
 elements = iron.MeshElements()
+elem_node_list = []
 meshComponentNumber=1
 elements.CreateStart(mesh,meshComponentNumber,basis)
-
-elem_node_list.append(1,2,3,4,5,6,7,8,9,25,26,27,28,29,30,31,32,33,49,50,51,52,53,54,55,56,57)
-elem_node_list.append(7,8,9,10,11,12,13,14,15,31,32,33,34,35,36,37,38,39,55,56,57,58,59,60,61,62,63)
-elem_node_list.append(13,14,15,16,17,18,19,20,21,37,38,39,40,41,42,43,44,45,61,62,63,64,65,66,67,68,69)
-elem_node_list.append(19,20,21,22,23,24,1,2,3,43,44,45,46,47,48,25,26,27,67,68,69,70,71,72,49,50,51)
-elements.NodesSet(1, elem_node_list[0])
-elements.NodesSet(2, elem_node_list[1])
-elements.NodesSet(3, elem_node_list[2])
-elements.NodesSet(4, elem_node_list[3])
-
-mesh.ElementsSet(elemidx+1,iron.ElementsQuadrilateral,elem_node_list)
-
-
+elements.NodesSet(1, els[0])
+elements.NodesSet(2, els[1])
+elements.NodesSet(3, els[2])
+elements.NodesSet(4, els[3])
 elements.CreateFinish()
 mesh.CreateFinish() 
 
@@ -314,71 +378,15 @@ geometricField.CreateFinish()
 #inner cubic hole unit length = 1.0 mm
 #Number of nodes = 16
 geometricField.ParameterSetUpdateStart(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES)
-# node 1
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,1,1,0.0)
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,1,2,0.0)
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,1,3,0.0)
-# node 2
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,2,1,0.0)
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,2,2,0.0)
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,2,3,1.0)
-# node 3
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,3,1,-1.0)
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,3,2,0.0)
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,3,3,0.0)
-# node 4
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,4,1, -1.0)
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,4,2,0.0)
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,4,3,1.0)
-# node 5
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,5,1,0.5)
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,5,2,-0.5)
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,5,3,0.0)
-# node 6
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,6,1,0.5)
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,6,2,-0.5)
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,6,3,1.0)
-# node 7
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,7,1,-1.5)
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,7,2,-0.5)
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,7,3,0.0)
-# node 8
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,8,1,-1.5)
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,8,2,-0.5)
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,8,3,1.0)
+for nodeidx in range(0,totalNumberOfNodes,1):
+    nodeNum = nodeidx+1
+    nodex = node_list[nodeidx][0]
+    nodey = node_list[nodeidx][1]
+    nodez = node_list[nodeidx][2]
+    geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,nodeNum,1,nodex)
+    geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,nodeNum,2,nodey)
+    geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,nodeNum,3,nodez)
 
- # node 9
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,9,1,0.0)
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,9,2,1.0)
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,9,3,0.0)
- # node 10
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,10,1,0.0)
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,10,2,1.0)
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,10,3,1.0)
- # node 11
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,11,1,0.5)
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,11,2,1.5)
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,11,3,0.0)
- # node 12
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,12,1,0.5)
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,12,2,1.5)
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,12,3,1.0)
-# # node 13
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,13,1,-1.0)
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,13,2,1.0)
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,13,3,0.0)
-# node 14
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,14,1,-1.0)
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,14,2,1.0)
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,14,3,1.0)
-# node 15
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,15,1,-1.5)
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,15,2,1.5)
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,15,3,0.0)
-# node 16
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,16,1,-1.5)
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,16,2,1.5)
-geometricField.ParameterSetUpdateNodeDP(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES,1,1,16,3,1.0)
 geometricField.ParameterSetUpdateFinish(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES)
 
 # Create a fibre field and attach it to the geometric field
@@ -517,36 +525,22 @@ problem.SolverEquationsCreateFinish()
 boundaryConditions = iron.BoundaryConditions()
 solverEquations.BoundaryConditionsCreateStart(boundaryConditions)
 
-boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.U,1,1,7,1,iron.BoundaryConditionsTypes.FIXED,0.0)
-boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.U,1,1,8,1,iron.BoundaryConditionsTypes.FIXED,0.0)
-boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.U,1,1,15,1,iron.BoundaryConditionsTypes.FIXED,0.0)
-boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.U,1,1,16,1,iron.BoundaryConditionsTypes.FIXED,0.0)
-
-# Set y=0 nodes to no y displacement
-boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.U,1,1,5,2,iron.BoundaryConditionsTypes.FIXED,0.0)
-boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.U,1,1,6,2,iron.BoundaryConditionsTypes.FIXED,0.0)
-boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.U,1,1,7,2,iron.BoundaryConditionsTypes.FIXED,0.0)
-boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.U,1,1,8,2,iron.BoundaryConditionsTypes.FIXED,0.0)
-
-# Set z=0 nodes to no y displacement
-boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.U,1,1,1,3,iron.BoundaryConditionsTypes.FIXED,0.0)
-boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.U,1,1,3,3,iron.BoundaryConditionsTypes.FIXED,0.0)
-boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.U,1,1,5,3,iron.BoundaryConditionsTypes.FIXED,0.0)
-boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.U,1,1,7,3,iron.BoundaryConditionsTypes.FIXED,0.0)
-boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.U,1,1,9,3,iron.BoundaryConditionsTypes.FIXED,0.0)
-boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.U,1,1,11,3,iron.BoundaryConditionsTypes.FIXED,0.0)
-boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.U,1,1,13,3,iron.BoundaryConditionsTypes.FIXED,0.0)
-boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.U,1,1,15,3,iron.BoundaryConditionsTypes.FIXED,0.0)
+for nodeidx in range(0,len(bottom_node_list),1):
+    nodeNum = bottom_node_list[nodeidx][0]
+    print(nodeNum)
+    boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.U,1,1,nodeNum,3,iron.BoundaryConditionsTypes.FIXED_INCREMENTED,0.0)
+for nodeidx in range(0,len(yfix_node_list),1):
+    nodeNum = yfix_node_list[nodeidx][0]
+    boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.U,1,1,nodeNum,2,iron.BoundaryConditionsTypes.FIXED_INCREMENTED,0.0)
+for nodeidx in range(0,len(xfix_node_list),1):
+    nodeNum = xfix_node_list[nodeidx][0]
+    boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.U,1,1,nodeNum,1,iron.BoundaryConditionsTypes.FIXED_INCREMENTED,0.0)
 
 #Pressure boundary conditions on the internal faces.
-boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.DELUDELN,1,1,1,3,iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED,10.0)
-boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.DELUDELN,1,1,2,3,iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED,10.0)
-#boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.DELUDELN,1,1,3,3,iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED,0.5)
-#boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.DELUDELN,1,1,4,3,iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED,0.5)
-boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.DELUDELN,1,1,9,3,iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED,10.0)
-boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.DELUDELN,1,1,10,3,iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED,10.0)
-#boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.DELUDELN,1,1,13,3,iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED,0.0)
-#boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.DELUDELN,1,1,14,3,iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED,0.0)
+for nodeidx in range(0,len(internal_node_list),1):
+    nodeNum = internal_node_list[nodeidx][0]
+    boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.DELUDELN,1,1,nodeNum,3,iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED,1.0)
+
 
 
 solverEquations.BoundaryConditionsCreateFinish()
@@ -558,7 +552,7 @@ vtkoutput(totalNumberOfNodes,totalNumberOfElements,mesh,geometricField,dependent
 # Export results
 fields = iron.Fields()
 fields.CreateRegion(region)
-fields.NodesExport("UniAxialExtension","FORTRAN")
-fields.ElementsExport("UniAxialExtension","FORTRAN")
+fields.NodesExport("CylinderInflation","FORTRAN")
+fields.ElementsExport("CylinderInflation","FORTRAN")
 fields.Finalise()
 
