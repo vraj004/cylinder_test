@@ -220,10 +220,18 @@ twist_angle = 0.0 #math.pi/6.0  #in radians
 #set number of elements in each direction of cylinder.
 numberOfRadialElements = 1
 numberOfCircumferentialElements = 4
-numberOfZElements = 1
+numberOfZElements = 2
 #set geometric basis interpolation to one of:
 # 1 - linear lagrange
 # 2 - quadratic lagrange
+# 3 - cubic lagrange
+# 4 - hermite cubic
+# 5 - hermite quintic
+# 6 - hermite septum
+# 7 - linear simplex
+# 8 - quadratic simplex
+# 9 - cubic simplex
+
 InterpolationType = 2
 #decide if you want to use a pressure basis for the pressure field
 UsePressureBasis = False
@@ -332,22 +340,19 @@ nodes.CreateStart(region,totalNumberOfNodes)
 nodes.CreateFinish()
 node_list, node_idx_list, top_node_list,bottom_node_list, yfix_node_list, xfix_node_list, internal_node_list,outer_node_list = generateMesh.annulus(r_inner, r_outer, z_length, numberOfRadialElements, numberOfCircumferentialElements, numberOfZElements, InterpolationType)
 
-els = [
-    list(range(1, 1+9, 1)) + list(range(25, 25+9, 1)) + list(range(49, 49+9, 1)),
-    list(range(7, 7+9, 1)) + list(range(31, 31+9, 1)) + list(range(55, 55+9, 1)),
-    list(range(13, 13+9, 1)) + list(range(37, 37+9, 1)) + list(range(61, 61+9, 1)),
-    [19, 20, 21, 22, 23, 24, 1, 2, 3] + [43, 44, 45, 46, 47, 48, 25, 26, 27] + [67, 68, 69, 70, 71, 72, 49, 50, 51]
-]
-
-# Define the element connectivity
+# Define elements for the mesh
 elements = iron.MeshElements()
-elem_node_list = []
-meshComponentNumber=1
+meshComponentNumber = 1
 elements.CreateStart(mesh,meshComponentNumber,geometricBasis)
-elements.NodesSet(1, els[0])
-elements.NodesSet(2, els[1])
-elements.NodesSet(3, els[2])
-elements.NodesSet(4, els[3])
+
+
+#els = [
+#    list(range(1, 1+9, 1)) + list(range(25, 25+9, 1)) + list(range(49, 49+9, 1)),
+#    list(range(7, 7+9, 1)) + list(range(31, 31+9, 1)) + list(range(55, 55+9, 1)),
+#    list(range(13, 13+9, 1)) + list(range(37, 37+9, 1)) + list(range(61, 61+9, 1)),
+#    [19, 20, 21, 22, 23, 24, 1, 2, 3] + [43, 44, 45, 46, 47, 48, 25, 26, 27] + [67, 68, 69, 70, 71, 72, 49, 50, 51]
+#]
+
 elements.CreateFinish()
 mesh.CreateFinish() 
 
