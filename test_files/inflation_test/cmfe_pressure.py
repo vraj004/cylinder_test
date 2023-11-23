@@ -550,6 +550,7 @@ def vtk_output(mesh, n_n, geo_field, dep_field, e_np_map, mesh_e, runtime_path, 
     # +============+
     e_list_gmsh = np.array(e_list)[:,:] - 1
     e_list_vtk = e_list_gmsh[:, GMSH2VTK]
+    print(e_list_vtk)
     meshio.write_points_cells(
         "vtk_files/" + test_name + test_type + ".vtk", 
         bef_def, 
