@@ -10,11 +10,11 @@ import matplotlib.pyplot as plt
 def print_winding():
     print("+== ... DISPLAY")
     # += Create test structure
-    node_list, node_idx_list, _, _, _, _, _, _, elem = annulus(1,2,1,2,4,1,2)
+    node_list, node_idx_list, _, _, _, _, _, _, elem = annulus(1,2,1,2,4,2,2)
     np_nodes = np.array(node_list)
     np_elems = np.array(elem)
     np_idx = np.array(node_idx_list)
-    np_idx -= 1
+    # np_idx -= 1
 
     # += Extract node positions
     x = np_nodes[:, 0].flatten()
@@ -78,6 +78,10 @@ def annulus(r_inner,r_outer,z_length,numberOfRadialElements,numberOfCircumferent
     internal_node_list = []
     outer_node_list = []
     elems = []
+    elem_n = numberOfRadialElements * numberOfCircumferentialElements * numberOfZElements
+    rad_node_n = numberOfRadialElements * InterpolationType
+    cir_node_n = numberOfCircumferentialElements * InterpolationType
+    cir_node_n = numberOfZElements * InterpolationType
     # += Element base centre
     xorig = 0.0 # x origin
     yorig = 0.0 # y origin
@@ -102,12 +106,13 @@ def annulus(r_inner,r_outer,z_length,numberOfRadialElements,numberOfCircumferent
     # += Quadratic
     elif (InterpolationType == 2):
         r_delta = elem_r_thickness/2.0
-        ridx_end = numberOfRadialElements+2
+        ridx_end = numberOfRadialElements*2 + 1
         theta_delta = elem_theta_rad / 2.0
         thetaidx_end = numberOfCircumferentialElements*2
         z_delta = elem_z_height/2.0
-        zidx_end = numberOfZElements+2
+        zidx_end = numberOfZElements*2 + 1
 
+    node_map = np.zeros((ridx_end, thetaidx_end, zidx_end))
     # +==+==+
     # Node set for radius values
     # += Iterate through radius indexes
@@ -148,52 +153,71 @@ def annulus(r_inner,r_outer,z_length,numberOfRadialElements,numberOfCircumferent
                     internal_node_list.append([node_idx])
                 if (ridx==ridx_end-1):
                     outer_node_list.append([node_idx])
+                node_map[ridx, thetaidx, zidx] = node_idx
     print('Total nodes in mesh=',len(node_list))
+    print(node_map)
+    if numberOfCircumferentialElements > 1:
+        end_points = np.array([[node_map[x, 0, :]] for x in range(0, ridx_end, 1)])
+        node_map = np.concatenate((node_map, end_points), axis=1)
+        thetaidx_end += 1
 
-    # +==+==+
-    # Element setup for set nodes
-    elemidx = 0
-    elem_start_theta2pi_nodeidx = 0
-    elem_start_nodeidx = 0
-    # += Iterate through number of screw axis elements
-    for zelemidx in range(0, numberOfZElements):
-        # += Iterate through number of elements in thickness
-        for radialelemidx in range(0, numberOfRadialElements):
-            # += Iterate through number of elements along ring perimeter
-            for circumelemidx in range(0, numberOfCircumferentialElements):
-                elemidx = elemidx + 1  # elem numbering starting at 1.
-                if(InterpolationType == 1):
-                    print('Linear interpolated element definition not implemented yet')
-                if (InterpolationType == 2):
-                    print('elem_start_nodeidx=', elem_start_nodeidx)
-                    elem_startmid_nodeidx = elem_start_nodeidx + (2 * 3 * numberOfCircumferentialElements)
-                    print('elem_startmid_nodeidx=', elem_startmid_nodeidx)
-                    elem_startend_nodeidx = elem_startmid_nodeidx + (2 * 3 * numberOfCircumferentialElements)
-                    print('elem_startend_nodeidx', elem_startend_nodeidx)
-                    if(circumelemidx==numberOfCircumferentialElements-1):
-                        elem_startmid_theta2pi_nodeidx = elem_start_theta2pi_nodeidx + (2 * 3 * numberOfCircumferentialElements)
-                        elem_startend_theta2pi_nodeidx = elem_startmid_theta2pi_nodeidx + (2 * 3 * numberOfCircumferentialElements)
+    e_assign = np.zeros((elem_n, 27))
+    e = 0
+    for i in range(0, ridx_end, 2):
+        for j in range(0, thetaidx_end, 2):
+            for k in range(0, zidx_end, 2):
+                if i+3 > ridx_end or j+3 > thetaidx_end or k+3 > zidx_end:
+                    continue
+                e_assign[e, :] = node_map[i:(i+3), j:(j+3), k:(k+3)].flatten()
+                e += 1
 
-                        elem_nodesxi3startidx = list(range(elem_start_nodeidx, elem_start_nodeidx + 6, 1))+list(range(elem_start_theta2pi_nodeidx, elem_start_theta2pi_nodeidx + 3, 1))
-                        elem_nodesxi3mididx = list(range(elem_startmid_nodeidx, elem_startmid_nodeidx + 6, 1))+list(range(elem_startmid_theta2pi_nodeidx, elem_startmid_theta2pi_nodeidx + 3, 1))
-                        elem_nodesxi3endidx = list(range(elem_startend_nodeidx, elem_startend_nodeidx + 6, 1))+list(range(elem_startend_theta2pi_nodeidx, elem_startend_theta2pi_nodeidx + 3, 1))
-                    else:
-                        elem_nodesxi3startidx = list(range(elem_start_nodeidx, elem_start_nodeidx + 9, 1))
-                        elem_nodesxi3mididx = list(range(elem_startmid_nodeidx, elem_startmid_nodeidx + 9, 1))
-                        elem_nodesxi3endidx = list(range(elem_startend_nodeidx, elem_startend_nodeidx + 9, 1))
+    print(e_assign)
 
-                    elem_node_indices = elem_nodesxi3startidx + elem_nodesxi3mididx + elem_nodesxi3endidx
+    # # +==+==+
+    # # Element setup for set nodes
+    # elemidx = 0
+    # elem_start_theta2pi_nodeidx = 0
+    # elem_start_nodeidx = 0
+    # # += Iterate through number of screw axis elements
+    # for zelemidx in range(0, numberOfZElements):
+    #     # += Iterate through number of elements in thickness
+    #     for radialelemidx in range(0, numberOfRadialElements):
+    #         # += Iterate through number of elements along ring perimeter
+    #         for circumelemidx in range(0, numberOfCircumferentialElements):
+    #             elemidx = elemidx + 1  # elem numbering starting at 1.
+    #             if(InterpolationType == 1):
+    #                 print('Linear interpolated element definition not implemented yet')
+    #             if (InterpolationType == 2):
+    #                 print('elem_start_nodeidx=', elem_start_nodeidx)
+    #                 elem_startmid_nodeidx = elem_start_nodeidx + (2 * 3 * numberOfCircumferentialElements)
+    #                 print('elem_startmid_nodeidx=', elem_startmid_nodeidx)
+    #                 elem_startend_nodeidx = elem_startmid_nodeidx + (2 * 3 * numberOfCircumferentialElements)
+    #                 print('elem_startend_nodeidx', elem_startend_nodeidx)
+    #                 if(circumelemidx==numberOfCircumferentialElements-1):
+    #                     elem_startmid_theta2pi_nodeidx = elem_start_theta2pi_nodeidx + (2 * 3 * numberOfCircumferentialElements)
+    #                     elem_startend_theta2pi_nodeidx = elem_startmid_theta2pi_nodeidx + (2 * 3 * numberOfCircumferentialElements)
 
-                    # elem_node_list.append()
-                    print('Element number', elemidx)
-                    print(elem_nodesxi3startidx)
-                    print(elem_nodesxi3mididx)
-                    print(elem_nodesxi3endidx)
-                    print(elem_node_indices)
-                    elems.append(elem_node_indices)
-                    elem_start_nodeidx = elem_start_nodeidx + 6
-    elem_start_theta2pi_nodeidx = elem_start_theta2pi_nodeidx + 6
-    return node_list, node_idx_list, top_node_list,bottom_node_list, yfix_node_list, xfix_node_list, internal_node_list, outer_node_list, elems
+    #                     elem_nodesxi3startidx = list(range(elem_start_nodeidx, elem_start_nodeidx + 6, 1))+list(range(elem_start_theta2pi_nodeidx, elem_start_theta2pi_nodeidx + 3, 1))
+    #                     elem_nodesxi3mididx = list(range(elem_startmid_nodeidx, elem_startmid_nodeidx + 6, 1))+list(range(elem_startmid_theta2pi_nodeidx, elem_startmid_theta2pi_nodeidx + 3, 1))
+    #                     elem_nodesxi3endidx = list(range(elem_startend_nodeidx, elem_startend_nodeidx + 6, 1))+list(range(elem_startend_theta2pi_nodeidx, elem_startend_theta2pi_nodeidx + 3, 1))
+    #                 else:
+    #                     elem_nodesxi3startidx = list(range(elem_start_nodeidx, elem_start_nodeidx + 9, 1))
+    #                     elem_nodesxi3mididx = list(range(elem_startmid_nodeidx, elem_startmid_nodeidx + 9, 1))
+    #                     elem_nodesxi3endidx = list(range(elem_startend_nodeidx, elem_startend_nodeidx + 9, 1))
+
+    #                 elem_node_indices = elem_nodesxi3startidx + elem_nodesxi3mididx + elem_nodesxi3endidx
+
+    #                 # elem_node_list.append()
+    #                 print('Element number', elemidx)
+    #                 print(elem_nodesxi3startidx)
+    #                 print(elem_nodesxi3mididx)
+    #                 print(elem_nodesxi3endidx)
+    #                 print(elem_node_indices)
+    #                 elems.append(elem_node_indices)
+    #                 elem_start_nodeidx = elem_start_nodeidx + 6
+    # elem_start_theta2pi_nodeidx = elem_start_theta2pi_nodeidx + 6
+
+    return node_list, node_idx_list, top_node_list,bottom_node_list, yfix_node_list, xfix_node_list, internal_node_list, outer_node_list, e_assign
 
 if __name__ == '__main__':
     print_winding()
