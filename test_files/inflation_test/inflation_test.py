@@ -212,8 +212,6 @@ def main(test_name, test_type, pressure_test):
     if pressure_test:
         cmfe_lin_basis = cmfe.basis_setup(lin_basis_n, XI_N, "linear")
         print('+==+ LIN BASIS SYSTEM COMPLETE')
-        n_np_xyz_lin, n_idx_lin, n_n_lin = nodes(test_name + "_pressure")
-        e_np_map_lin, e_idx_lin, e_n_lin = elems(test_name + "_pressure")
 
     # +============+
     # Mesh infrastructure

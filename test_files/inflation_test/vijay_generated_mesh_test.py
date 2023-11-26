@@ -50,7 +50,6 @@
 
 #> Main script
 # Add Python bindings directory to PATH
-import sys, os
 
 #sys.path.append(os.sep.join((os.environ['OPENCMISS_ROOT'],'cm','bindings','python')))
 
@@ -63,6 +62,7 @@ import generateMesh
 
 
 #Setting up the vtk output function before use after solve.
+
 def vtkoutput(totalNumberOfNodes, totalNumberOfElements, mesh,geo_field,dep_field):
     X = 1
     Y = 2
@@ -241,6 +241,7 @@ UsePressureBasis = False
 coordinateSystemUserNumber = 1
 regionUserNumber = 1
 geometricbasisUserNumber = 1
+
 pressureBasisUserNumber = 2
 generatedMeshUserNumber = 1
 meshUserNumber = 1
@@ -252,8 +253,6 @@ dependentFieldUserNumber = 4
 equationsSetUserNumber = 1
 equationsSetFieldUserNumber = 5
 problemUserNumber = 1
-
-
 
 # Get the number of computational nodes and this computational node number
 numberOfComputationalNodes = iron.ComputationalNumberOfNodesGet()
