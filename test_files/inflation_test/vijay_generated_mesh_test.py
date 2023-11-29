@@ -123,18 +123,47 @@ def vtkoutput(totalNumberOfNodes, totalNumberOfElements, mesh,geo_field,dep_fiel
     # +============+
     # Store elements
     # +============+
+    meshElements = iron.MeshElements()
+    mesh.ElementsGet(1,meshElements)
 
     e_list = []
-    e_list.append(
-        [1, 2, 3, 4, 5, 6, 7, 8, 9, 25, 26, 27, 28, 29, 30, 31, 32, 33, 49, 50, 51, 52, 53, 54, 55, 56, 57])
-    e_list.append(
-        [7, 8, 9, 10, 11, 12, 13, 14, 15, 31, 32, 33, 34, 35, 36, 37, 38, 39, 55, 56, 57, 58, 59, 60, 61, 62, 63])
-    e_list.append(
-        [13, 14, 15, 16, 17, 18, 19, 20, 21, 37, 38, 39, 40, 41, 42, 43, 44, 45, 61, 62, 63, 64, 65, 66, 67, 68, 69])
-    e_list.append(
-        [19, 20, 21, 22, 23, 24, 1, 2, 3, 43, 44, 45, 46, 47, 48, 25, 26, 27, 67, 68, 69, 70, 71, 72, 49, 50, 51])
+    for i in range(0, totalNumberOfElements, 1):
+        e_list.append(
+            [
+                i+1,
+                meshElements.NodesGet(i+1, 27)[0],
+                meshElements.NodesGet(i+1, 27)[1],
+                meshElements.NodesGet(i+1, 27)[2],
+                meshElements.NodesGet(i+1, 27)[3],
+                meshElements.NodesGet(i+1, 27)[4],
+                meshElements.NodesGet(i+1, 27)[5],
+                meshElements.NodesGet(i+1, 27)[6],
+                meshElements.NodesGet(i+1, 27)[7],
+                meshElements.NodesGet(i+1,27)[8],
+                meshElements.NodesGet(i+1,27)[9],
+                meshElements.NodesGet(i+1,27)[10],
+                meshElements.NodesGet(i+1,27)[11],
+                meshElements.NodesGet(i+1,27)[12],
+                meshElements.NodesGet(i+1,27)[13],
+                meshElements.NodesGet(i+1,27)[14],
+                meshElements.NodesGet(i+1,27)[15],
+                meshElements.NodesGet(i+1,27)[16],
+                meshElements.NodesGet(i+1,27)[17],
+                meshElements.NodesGet(i+1,27)[18],
+                meshElements.NodesGet(i+1,27)[19],
+                meshElements.NodesGet(i+1,27)[20],
+                meshElements.NodesGet(i+1,27)[21],
+                meshElements.NodesGet(i+1,27)[22],
+                meshElements.NodesGet(i+1,27)[23],
+                meshElements.NodesGet(i+1,27)[24],
+                meshElements.NodesGet(i+1,27)[25],
+                meshElements.NodesGet(i+1,27)[26]
+                
+            ]
+        )
 
     e_list_iron = np.array(e_list)[:,:]-1
+    print(e_list_iron)
 
 
     # Iron Numbering for 27?
@@ -220,7 +249,7 @@ twist_angle = 0.0 #math.pi/6.0  #in radians
 #set number of elements in each direction of cylinder.
 numberOfRadialElements = 1
 numberOfCircumferentialElements = 4
-numberOfZElements = 2
+numberOfZElements = 1
 #set geometric basis interpolation to one of:
 # 1 - linear lagrange
 # 2 - quadratic lagrange
@@ -337,14 +366,19 @@ mesh.NumberOfElementsSet(totalNumberOfElements)
 nodes = iron.Nodes()
 nodes.CreateStart(region,totalNumberOfNodes)
 nodes.CreateFinish()
-node_list, node_idx_list, top_node_list,bottom_node_list, yfix_node_list, xfix_node_list, internal_node_list,outer_node_list = generateMesh.annulus(r_inner, r_outer, z_length, numberOfRadialElements, numberOfCircumferentialElements, numberOfZElements, InterpolationType)
+node_list, node_idx_list, top_node_list,bottom_node_list, yfix_node_list, xfix_node_list, internal_node_list,outer_node_list,e_assign = generateMesh.annulus(r_inner, r_outer, z_length, numberOfRadialElements, numberOfCircumferentialElements, numberOfZElements, InterpolationType)
 
 # Define elements for the mesh
 elements = iron.MeshElements()
 meshComponentNumber = 1
 elements.CreateStart(mesh,meshComponentNumber,geometricBasis)
 
-
+for elemidx in range(0,totalNumberOfElements,1):
+    elemNum = elemidx+1
+    elemNodes = e_assign[elemidx]
+    print('listing each element nodes')
+    print(elemNodes)
+    elements.NodesSet(elemNum,elemNodes)
 #els = [
 #    list(range(1, 1+9, 1)) + list(range(25, 25+9, 1)) + list(range(49, 49+9, 1)),
 #    list(range(7, 7+9, 1)) + list(range(31, 31+9, 1)) + list(range(55, 55+9, 1)),
@@ -381,6 +415,7 @@ geometricField.CreateFinish()
 #Number of nodes = 16
 geometricField.ParameterSetUpdateStart(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES)
 for nodeidx in range(0,totalNumberOfNodes,1):
+    print(nodeidx)
     nodeNum = nodeidx+1
     nodex = node_list[nodeidx][0]
     nodey = node_list[nodeidx][1]
