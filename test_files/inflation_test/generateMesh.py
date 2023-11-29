@@ -162,7 +162,7 @@ def annulus(r_inner,r_outer,z_length,numberOfRadialElements,numberOfCircumferent
         node_map = np.concatenate((node_map, end_points), axis=1)
         thetaidx_end += 1
 
-    e_assign = np.zeros((elem_n, 27))
+    e_assign = np.zeros((elem_n, 27),dtype=np.int32)
     e = 0
     for i in range(0, ridx_end, 2):
         for j in range(0, thetaidx_end, 2):
@@ -172,6 +172,7 @@ def annulus(r_inner,r_outer,z_length,numberOfRadialElements,numberOfCircumferent
                 e_assign[e, :] = node_map[i:(i+3), j:(j+3), k:(k+3)].flatten()
                 e += 1
 
+    print('Total elements in mesh=',len(e_assign))
     print(e_assign)
 
     # # +==+==+
