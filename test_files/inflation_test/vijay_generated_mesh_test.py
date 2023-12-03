@@ -128,42 +128,9 @@ def vtkoutput(totalNumberOfNodes, totalNumberOfElements, mesh,geo_field,dep_fiel
 
     e_list = []
     for i in range(0, totalNumberOfElements, 1):
-        e_list.append(
-            [
-                i+1,
-                meshElements.NodesGet(i+1, 27)[0],
-                meshElements.NodesGet(i+1, 27)[1],
-                meshElements.NodesGet(i+1, 27)[2],
-                meshElements.NodesGet(i+1, 27)[3],
-                meshElements.NodesGet(i+1, 27)[4],
-                meshElements.NodesGet(i+1, 27)[5],
-                meshElements.NodesGet(i+1, 27)[6],
-                meshElements.NodesGet(i+1, 27)[7],
-                meshElements.NodesGet(i+1,27)[8],
-                meshElements.NodesGet(i+1,27)[9],
-                meshElements.NodesGet(i+1,27)[10],
-                meshElements.NodesGet(i+1,27)[11],
-                meshElements.NodesGet(i+1,27)[12],
-                meshElements.NodesGet(i+1,27)[13],
-                meshElements.NodesGet(i+1,27)[14],
-                meshElements.NodesGet(i+1,27)[15],
-                meshElements.NodesGet(i+1,27)[16],
-                meshElements.NodesGet(i+1,27)[17],
-                meshElements.NodesGet(i+1,27)[18],
-                meshElements.NodesGet(i+1,27)[19],
-                meshElements.NodesGet(i+1,27)[20],
-                meshElements.NodesGet(i+1,27)[21],
-                meshElements.NodesGet(i+1,27)[22],
-                meshElements.NodesGet(i+1,27)[23],
-                meshElements.NodesGet(i+1,27)[24],
-                meshElements.NodesGet(i+1,27)[25],
-                meshElements.NodesGet(i+1,27)[26]
-                
-            ]
-        )
+        e_list.append(meshElements.NodesGet(i+1, 27))
 
     e_list_iron = np.array(e_list)[:,:]-1
-    print(e_list_iron)
 
 
     # Iron Numbering for 27?
@@ -241,14 +208,14 @@ z_length = 1.0
 c10 = 2.0
 c01 = 6.0
 #loading conditions
-pressure_internal = 5.0
-pressure_external = -1.0
+pressure_internal = 0.0
+pressure_external = 0.0
 stretch_ratio = 0.8
 twist_angle = 0.0 #math.pi/6.0  #in radians
 #mesh parameters
 #set number of elements in each direction of cylinder.
 numberOfRadialElements = 1
-numberOfCircumferentialElements = 4
+numberOfCircumferentialElements = 12
 numberOfZElements = 1
 #set geometric basis interpolation to one of:
 # 1 - linear lagrange
@@ -366,7 +333,11 @@ mesh.NumberOfElementsSet(totalNumberOfElements)
 nodes = iron.Nodes()
 nodes.CreateStart(region,totalNumberOfNodes)
 nodes.CreateFinish()
-node_list, node_idx_list, top_node_list,bottom_node_list, yfix_node_list, xfix_node_list, internal_node_list,outer_node_list,e_assign = generateMesh.annulus(r_inner, r_outer, z_length, numberOfRadialElements, numberOfCircumferentialElements, numberOfZElements, InterpolationType)
+(
+    node_list, node_idx_list, top_node_list, 
+    bottom_node_list, yfix_node_list, xfix_node_list, 
+    internal_node_list,outer_node_list, e_assign
+) = generateMesh.annulus(r_inner, r_outer, z_length, numberOfRadialElements, numberOfCircumferentialElements, numberOfZElements, InterpolationType)
 
 # Define elements for the mesh
 elements = iron.MeshElements()
@@ -375,10 +346,9 @@ elements.CreateStart(mesh,meshComponentNumber,geometricBasis)
 
 for elemidx in range(0,totalNumberOfElements,1):
     elemNum = elemidx+1
-    elemNodes = e_assign[elemidx]
+    elemNodes = np.array(e_assign[elemidx], dtype=np.int32)
     print('listing each element nodes')
-    print(elemNodes)
-    elements.NodesSet(elemNum,elemNodes)
+    elements.NodesSet(int(elemNum), elemNodes)
 #els = [
 #    list(range(1, 1+9, 1)) + list(range(25, 25+9, 1)) + list(range(49, 49+9, 1)),
 #    list(range(7, 7+9, 1)) + list(range(31, 31+9, 1)) + list(range(55, 55+9, 1)),
