@@ -60,6 +60,30 @@ import numpy as np
 import meshio
 import generateMesh
 
+# VIJAY_IRON = [
+#     6, 3, 0, 15, 12, 9, 24, 21, 18,
+#     7, 4, 1, 16, 13, 10, 25, 22, 19,
+#     8, 5, 2, 17, 14, 11, 26, 23, 20
+# ]
+
+# VIJAY_IRON = [
+#     0, 9, 18, 3, 12, 21, 6, 15, 24,
+#     1, 10, 19, 4, 13, 22, 7, 16, 25,
+#     2, 11, 20, 5, 14, 23, 8, 17, 26
+# ]
+
+# VIJAY_IRON = [
+#     0, 3, 6, 9, 12, 15, 18, 21, 24,
+#     1, 4, 7, 10, 13, 16, 19, 22, 25,
+#     2, 5, 8, 11, 14, 17, 20, 23, 26
+# ]
+
+# VIJAY_IRON = [
+#     6, 15, 24, 3, 12, 21, 0, 9, 18,
+#     7, 16, 25, 4, 13, 22, 1, 10, 19,
+#     8, 17, 26, 5, 14, 23, 2, 11, 20
+# ]
+
 
 #Setting up the vtk output function before use after solve.
 
@@ -132,8 +156,10 @@ def vtkoutput(totalNumberOfNodes, totalNumberOfElements, mesh,geo_field,dep_fiel
 
     e_list_iron = np.array(e_list)[:,:]-1
 
+    print(e_list_iron)
 
-    # Iron Numbering for 27?
+
+    # Iron Numbering for Hexa-27
     #   *  z = 0           z = 0.5         z = 1          
     #   *  6--7 --8     * 15--16--17    x 24--25--26
     #   *  |      |     *  |      |     x  |      |
@@ -157,19 +183,13 @@ def vtkoutput(totalNumberOfNodes, totalNumberOfElements, mesh,geo_field,dep_fiel
     #   *  |      |     *  |      |     x  |      |
     #   *  0-- 8--1     * 16--22--17    x  4--12--5 
 
-    # IRON_VTK = [
-    #     0, 2, 8, 6, 18, 20, 26, 24, 
-    #     1, 5, 7, 3, 19, 13, 25, 21, 
-    #     9, 11, 17, 15, 12, 14, 10, 16, 
-    #     4, 22, 13
-    # ]
-
     VIJAY_VTK = [
         6, 24, 18, 0, 8, 26, 20, 2, 
         15, 21, 9, 3, 17, 23, 11, 5, 
         7, 25, 19, 1, 4, 22, 16, 10, 
         12, 14, 13
     ]
+
 
     e_list_vtk = e_list_iron[:, VIJAY_VTK]
 
@@ -208,15 +228,15 @@ z_length = 1.0
 c10 = 2.0
 c01 = 6.0
 #loading conditions
-pressure_internal = 5.0
-pressure_external = -1.0
-stretch_ratio = 0.8
+pressure_internal = 0.0
+pressure_external = 0.0
+stretch_ratio = 0.2
 twist_angle = 0.0 #math.pi/6.0  #in radians
 #mesh parameters
 #set number of elements in each direction of cylinder.
 numberOfRadialElements = 1
 numberOfCircumferentialElements = 4
-numberOfZElements = 1
+numberOfZElements = 2
 #set geometric basis interpolation to one of:
 # 1 - linear lagrange
 # 2 - quadratic lagrange
@@ -336,25 +356,43 @@ nodes.CreateFinish()
 (
     node_list, node_idx_list, top_node_list, 
     bottom_node_list, yfix_node_list, xfix_node_list, 
-    internal_node_list,outer_node_list, e_assign
+    internal_node_list, outer_node_list, e_assign
 ) = generateMesh.annulus(r_inner, r_outer, z_length, numberOfRadialElements, numberOfCircumferentialElements, numberOfZElements, InterpolationType)
 
+
+# import matplotlib.pyplot as plt
+# # Create the 3D scatter plot
+# fig = plt.figure()
+# ax = fig.add_subplot(111, projection='3d')
+# for i, k in enumerate(e_assign[3, :]):
+#     print(node_list[int(k)-1])
+#     x = node_list[int(k)-1][0]
+#     y = node_list[int(k)-1][1]
+#     z = node_list[int(k)-1][2]
+#     ax.text(x, y, z, str(int(k)), color='red')
+#     ax.scatter(x, y, z, s=50)
+
+# # Set labels for the axes
+# ax.set_xlabel('X-axis')
+# ax.set_ylabel('Y-axis')
+# ax.set_zlabel('Z-axis')
+
+# for ii in range(0,360,90):
+#         ax.view_init(elev=10., azim=ii)
+#         plt.savefig("movie%d.png" % ii)
+
+# print(tea)
 # Define elements for the mesh
 elements = iron.MeshElements()
 meshComponentNumber = 1
 elements.CreateStart(mesh,meshComponentNumber,geometricBasis)
 
-for elemidx in range(0,totalNumberOfElements,1):
+for elemidx in range(0, len(e_assign[:,0]), 1):
     elemNum = elemidx+1
+    # elemNodes = np.array(e_assign[elemidx, VIJAY_IRON], dtype=np.int32)
     elemNodes = np.array(e_assign[elemidx], dtype=np.int32)
-    print('listing each element nodes')
+    # print('listing each element nodes')
     elements.NodesSet(int(elemNum), elemNodes)
-#els = [
-#    list(range(1, 1+9, 1)) + list(range(25, 25+9, 1)) + list(range(49, 49+9, 1)),
-#    list(range(7, 7+9, 1)) + list(range(31, 31+9, 1)) + list(range(55, 55+9, 1)),
-#    list(range(13, 13+9, 1)) + list(range(37, 37+9, 1)) + list(range(61, 61+9, 1)),
-#    [19, 20, 21, 22, 23, 24, 1, 2, 3] + [43, 44, 45, 46, 47, 48, 25, 26, 27] + [67, 68, 69, 70, 71, 72, 49, 50, 51]
-#]
 
 elements.CreateFinish()
 mesh.CreateFinish() 
@@ -384,7 +422,8 @@ geometricField.CreateFinish()
 #inner cubic hole unit length = 1.0 mm
 #Number of nodes = 16
 geometricField.ParameterSetUpdateStart(iron.FieldVariableTypes.U,iron.FieldParameterSetTypes.VALUES)
-for nodeidx in range(0,totalNumberOfNodes,1):
+print('Total nodes in mesh=',len(node_list))
+for nodeidx in range(0,len(node_list),1):
     # print(nodeidx)
     nodeNum = nodeidx+1
     nodex = node_list[nodeidx][0]
@@ -511,7 +550,7 @@ nonLinearSolver = iron.Solver()
 linearSolver = iron.Solver()
 problem.SolversCreateStart()
 problem.SolverGet([iron.ControlLoopIdentifiers.NODE],1,nonLinearSolver)
-nonLinearSolver.outputType = iron.SolverOutputTypes.PROGRESS
+nonLinearSolver.outputType = iron.SolverOutputTypes.NONE
 nonLinearSolver.NewtonJacobianCalculationTypeSet(iron.JacobianCalculationTypes.FD)
 nonLinearSolver.NewtonLinearSolverGet(linearSolver)
 linearSolver.linearType = iron.LinearSolverTypes.DIRECT
@@ -532,44 +571,67 @@ problem.SolverEquationsCreateFinish()
 boundaryConditions = iron.BoundaryConditions()
 solverEquations.BoundaryConditionsCreateStart(boundaryConditions)
 
-for nodeidx in range(0,len(bottom_node_list),1):
-    nodeNum = bottom_node_list[nodeidx][0]
-    print(nodeNum)
-    boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.U,1,1,nodeNum,3,iron.BoundaryConditionsTypes.FIXED_INCREMENTED,0.0)
-for nodeidx in range(0,len(yfix_node_list),1):
-    nodeNum = yfix_node_list[nodeidx][0]
-    boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.U,1,1,nodeNum,2,iron.BoundaryConditionsTypes.FIXED_INCREMENTED,0.0)
-for nodeidx in range(0,len(xfix_node_list),1):
-    nodeNum = xfix_node_list[nodeidx][0]
-    boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.U,1,1,nodeNum,1,iron.BoundaryConditionsTypes.FIXED_INCREMENTED,0.0)
+locked, extended, pressured = [], [], []
+for i in node_idx_list:
+    idx = i[0]-1
+    if np.isclose(node_list[idx][2], 0):
+        locked.append(idx)
+        boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.U,1,1,idx+1,3,iron.BoundaryConditionsTypes.FIXED_INCREMENTED,0.0)
+        boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.U,1,1,idx+1,2,iron.BoundaryConditionsTypes.FIXED_INCREMENTED,0.0)
+        boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.U,1,1,idx+1,1,iron.BoundaryConditionsTypes.FIXED_INCREMENTED,0.0)
+        continue
+    if np.isclose(node_list[idx][2], z_length):
+        extended.append(idx)
+        boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.U,1,1,idx+1,3,iron.BoundaryConditionsTypes.FIXED_INCREMENTED,0.2)
+    # if np.isclose(np.linalg.norm([node_list[idx][0], node_list[idx][1]]), r_inner):
+    #     pressured.append(idx)
+    #     boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.DELUDELN,1,1,nodeNum,3,iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED,pressure_internal)
+    #     continue
+    # if np.isclose(np.linalg.norm([node_list[idx][0], node_list[idx][1]]), r_outer):
+    #     pressured.append(idx)
+    #     boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.DELUDELN,1,1,nodeNum,3,iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED,pressure_external)
+    #     continue
 
-#Pressure boundary conditions on the internal faces.
-for nodeidx in range(0,len(internal_node_list),1):
-    nodeNum = internal_node_list[nodeidx][0]
-    boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.DELUDELN,1,1,nodeNum,3,iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED,pressure_internal)
+print("LOCKED: {}".format(locked))
+print("PRESSURED: {}".format(pressured))
+print("EXTENDED: {}".format(extended))
 
-#Pressure boundary conditions on the external faces.
-for nodeidx in range(0,len(outer_node_list),1):
-    nodeNum = outer_node_list[nodeidx][0]
-    boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.DELUDELN,1,1,nodeNum,3,iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED,pressure_external)
+# for nodeidx in range(0,len(bottom_node_list),1):
+#     nodeNum = bottom_node_list[nodeidx][0]
+#     # print(nodeNum)
+#     boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.U,1,1,nodeNum,3,iron.BoundaryConditionsTypes.FIXED_INCREMENTED,0.0)
+# for nodeidx in range(0,len(yfix_node_list),1):
+#     nodeNum = yfix_node_list[nodeidx][0]
+#     boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.U,1,1,nodeNum,2,iron.BoundaryConditionsTypes.FIXED_INCREMENTED,0.0)
+# for nodeidx in range(0,len(xfix_node_list),1):
+#     nodeNum = xfix_node_list[nodeidx][0]
+#     boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.U,1,1,nodeNum,1,iron.BoundaryConditionsTypes.FIXED_INCREMENTED,0.0)
 
+# #Pressure boundary conditions on the internal faces.
+# for nodeidx in range(0,len(internal_node_list),1):
+#     nodeNum = internal_node_list[nodeidx][0]
+#     boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.DELUDELN,1,1,nodeNum,3,iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED,pressure_internal)
+
+# #Pressure boundary conditions on the external faces.
+# for nodeidx in range(0,len(outer_node_list),1):
+#     nodeNum = outer_node_list[nodeidx][0]
+#     boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.DELUDELN,1,1,nodeNum,3,iron.BoundaryConditionsTypes.PRESSURE_INCREMENTED,pressure_external)
 
 #Apply stretch boundary condition on top faces.
-for nodeidx in range(0,len(top_node_list),1):
-    nodeNum = top_node_list[nodeidx][0]
-    stretch_disp = stretch_ratio*z_length-z_length
-    boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.U,1,1,nodeNum,3,iron.BoundaryConditionsTypes.FIXED_INCREMENTED,stretch_disp)
+# for nodeidx in range(0,len(top_node_list),1):
+#     nodeNum = top_node_list[nodeidx][0]
+#     stretch_disp = stretch_ratio*z_length-z_length
+#     boundaryConditions.AddNode(dependentField,iron.FieldVariableTypes.U,1,1,nodeNum,3,iron.BoundaryConditionsTypes.FIXED_INCREMENTED,stretch_disp)
 
 solverEquations.BoundaryConditionsCreateFinish()
 
 # Solve the problem
 problem.Solve()
 
-vtkoutput(totalNumberOfNodes,totalNumberOfElements,mesh,geometricField,dependentField)
+vtkoutput(len(node_list),totalNumberOfElements,mesh,geometricField,dependentField)
 # Export results
 fields = iron.Fields()
 fields.CreateRegion(region)
 fields.NodesExport("CylinderInflation","FORTRAN")
 fields.ElementsExport("CylinderInflation","FORTRAN")
 fields.Finalise()
-
