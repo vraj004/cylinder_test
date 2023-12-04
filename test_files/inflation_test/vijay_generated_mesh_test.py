@@ -234,7 +234,7 @@ stretch_ratio = 0.2
 twist_angle = 0.0 #math.pi/6.0  #in radians
 #mesh parameters
 #set number of elements in each direction of cylinder.
-numberOfRadialElements = 1
+numberOfRadialElements = 2
 numberOfCircumferentialElements = 4
 numberOfZElements = 2
 #set geometric basis interpolation to one of:
