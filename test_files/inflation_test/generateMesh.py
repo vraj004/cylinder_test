@@ -119,7 +119,7 @@ def annulus(r_inner,r_outer,z_length,numberOfRadialElements,numberOfCircumferent
     # += Iterate through radius indexes
     for ridx in range(0, ridx_end, 1):
         r = r_inner + ridx * r_delta
-        print(r)
+        # print(r)
         # += Iterate through circumference indexes
         for thetaidx in range(0, thetaidx_end, 1):
             theta = theta_orig - thetaidx * theta_delta
@@ -136,12 +136,12 @@ def annulus(r_inner,r_outer,z_length,numberOfRadialElements,numberOfCircumferent
                 )
                 node_idx = node_idx + 1 #node numbering starting at 1.
                 node_idx_list.append([node_idx])
-                print('node_idx=',node_idx)
-                print([
-                    xorig + r * math.cos(theta),
-                    yorig + r * math.sin(theta),
-                    zorig + z
-                ])
+                # print('node_idx=',node_idx)
+                # print([
+                #     xorig + r * math.cos(theta),
+                #     yorig + r * math.sin(theta),
+                #     zorig + z
+                # ])
                 if (thetaidx == 0 or thetaidx == 4):
                     yfix_node_list.append([node_idx])
                 if (zidx == 0):
@@ -174,50 +174,6 @@ def annulus(r_inner,r_outer,z_length,numberOfRadialElements,numberOfCircumferent
 
     print('Total elements in mesh=',len(e_assign))
     print(e_assign)
-
-    # # +==+==+
-    # # Element setup for set nodes
-    # elemidx = 0
-    # elem_start_theta2pi_nodeidx = 0
-    # elem_start_nodeidx = 0
-    # # += Iterate through number of screw axis elements
-    # for zelemidx in range(0, numberOfZElements):
-    #     # += Iterate through number of elements in thickness
-    #     for radialelemidx in range(0, numberOfRadialElements):
-    #         # += Iterate through number of elements along ring perimeter
-    #         for circumelemidx in range(0, numberOfCircumferentialElements):
-    #             elemidx = elemidx + 1  # elem numbering starting at 1.
-    #             if(InterpolationType == 1):
-    #                 print('Linear interpolated element definition not implemented yet')
-    #             if (InterpolationType == 2):
-    #                 print('elem_start_nodeidx=', elem_start_nodeidx)
-    #                 elem_startmid_nodeidx = elem_start_nodeidx + (2 * 3 * numberOfCircumferentialElements)
-    #                 print('elem_startmid_nodeidx=', elem_startmid_nodeidx)
-    #                 elem_startend_nodeidx = elem_startmid_nodeidx + (2 * 3 * numberOfCircumferentialElements)
-    #                 print('elem_startend_nodeidx', elem_startend_nodeidx)
-    #                 if(circumelemidx==numberOfCircumferentialElements-1):
-    #                     elem_startmid_theta2pi_nodeidx = elem_start_theta2pi_nodeidx + (2 * 3 * numberOfCircumferentialElements)
-    #                     elem_startend_theta2pi_nodeidx = elem_startmid_theta2pi_nodeidx + (2 * 3 * numberOfCircumferentialElements)
-
-    #                     elem_nodesxi3startidx = list(range(elem_start_nodeidx, elem_start_nodeidx + 6, 1))+list(range(elem_start_theta2pi_nodeidx, elem_start_theta2pi_nodeidx + 3, 1))
-    #                     elem_nodesxi3mididx = list(range(elem_startmid_nodeidx, elem_startmid_nodeidx + 6, 1))+list(range(elem_startmid_theta2pi_nodeidx, elem_startmid_theta2pi_nodeidx + 3, 1))
-    #                     elem_nodesxi3endidx = list(range(elem_startend_nodeidx, elem_startend_nodeidx + 6, 1))+list(range(elem_startend_theta2pi_nodeidx, elem_startend_theta2pi_nodeidx + 3, 1))
-    #                 else:
-    #                     elem_nodesxi3startidx = list(range(elem_start_nodeidx, elem_start_nodeidx + 9, 1))
-    #                     elem_nodesxi3mididx = list(range(elem_startmid_nodeidx, elem_startmid_nodeidx + 9, 1))
-    #                     elem_nodesxi3endidx = list(range(elem_startend_nodeidx, elem_startend_nodeidx + 9, 1))
-
-    #                 elem_node_indices = elem_nodesxi3startidx + elem_nodesxi3mididx + elem_nodesxi3endidx
-
-    #                 # elem_node_list.append()
-    #                 print('Element number', elemidx)
-    #                 print(elem_nodesxi3startidx)
-    #                 print(elem_nodesxi3mididx)
-    #                 print(elem_nodesxi3endidx)
-    #                 print(elem_node_indices)
-    #                 elems.append(elem_node_indices)
-    #                 elem_start_nodeidx = elem_start_nodeidx + 6
-    # elem_start_theta2pi_nodeidx = elem_start_theta2pi_nodeidx + 6
 
     return node_list, node_idx_list, top_node_list,bottom_node_list, yfix_node_list, xfix_node_list, internal_node_list, outer_node_list, e_assign
 
