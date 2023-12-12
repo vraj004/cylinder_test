@@ -155,8 +155,8 @@ def annulus(r_inner,r_outer,z_length,numberOfRadialElements,numberOfCircumferent
                 if (ridx==ridx_end-1):
                     outer_node_list.append([node_idx])
                 node_map[ridx, thetaidx, zidx] = node_idx
-    print('Total nodes in mesh=',len(node_list))
-    print(node_map)
+    #print('Total nodes in mesh=',len(node_list))
+    #print(node_map)
     if numberOfCircumferentialElements > 1:
         end_points = np.array([[node_map[x, 0, :]] for x in range(0, ridx_end, 1)])
         node_map = np.concatenate((node_map, end_points), axis=1)
