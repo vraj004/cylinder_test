@@ -59,7 +59,7 @@ import math
 import numpy as np
 import meshio
 import generateMesh
-import scipy.optimize
+#import scipy.optimize
 import matplotlib.pyplot as plt
 
 # VIJAY_IRON = [
@@ -242,7 +242,7 @@ twist_angle = 0.0 #math.pi/6.0  #in radians
 #set number of elements in each direction of cylinder by setting refined_mesh_option.
 #set refinement option stored in a list as [radial,circumferential,z]
 refined_mesh = [[1,4,1],[1,8,1],[2,4,1],[2,8,1],[2,8,2],[4,16,2],[4,16,8],[4,32,16],[8,64,16]]
-refined_mesh_option = 7
+refined_mesh_option = 0
 numberOfRadialElements = refined_mesh[refined_mesh_option][0]
 numberOfCircumferentialElements = refined_mesh[refined_mesh_option][1]
 numberOfZElements = refined_mesh[refined_mesh_option][2]
@@ -264,6 +264,7 @@ numberOfLoadIncrements = 3
 #From here the code sets up the problem with the inputs from above.
 
 # Set OpenCMISS parameters
+contextUserNumber = 1
 coordinateSystemUserNumber = 1
 regionUserNumber = 1
 geometricbasisUserNumber = 1
@@ -272,6 +273,7 @@ pressureBasisUserNumber = 2
 generatedMeshUserNumber = 1
 meshUserNumber = 1
 decompositionUserNumber = 1
+decomposerUserNumber = 1
 geometricFieldUserNumber = 1
 fibreFieldUserNumber = 2
 materialFieldUserNumber = 3
@@ -281,19 +283,34 @@ equationsSetFieldUserNumber = 5
 problemUserNumber = 1
 dataPointsUserNumber=1
 dataProjectionUserNumber=1
-# Get the number of computational nodes and this computational node number
-numberOfComputationalNodes = iron.ComputationalNumberOfNodesGet()
-computationalNodeNumber = iron.ComputationalNodeNumberGet()
+
+#create context for simulation to be set up
+
+context = iron.Context()
+context.Create(contextUserNumber)
+
+worldRegion =  iron.Region()
+context.WorldRegionGet(worldRegion)
+
+#Get the number of computational nodes and this computational node number
+computationEnvironment = iron.ComputationEnvironment()
+context.ComputationEnvironmentGet(computationEnvironment)
+
+worldWorkGroup = iron.WorkGroup()
+computationEnvironment.WorldWorkGroupGet(worldWorkGroup)
+numberOfComputationalNodes = worldWorkGroup.NumberOfGroupNodesGet()
+computationalNodeNumber = worldWorkGroup.GroupNodeNumberGet()
+
 
 # Create a 3D rectangular cartesian coordinate system
 coordinateSystem = iron.CoordinateSystem()
-coordinateSystem.CreateStart(coordinateSystemUserNumber)
+coordinateSystem.CreateStart(coordinateSystemUserNumber,context)
 coordinateSystem.DimensionSet(3)
 coordinateSystem.CreateFinish()
 
 # Create a region and assign the coordinate system to the region
 region = iron.Region()
-region.CreateStart(regionUserNumber,iron.WorldRegion)
+region.CreateStart(regionUserNumber,worldRegion)
 region.LabelSet("Region")
 region.coordinateSystem = coordinateSystem
 region.CreateFinish()
@@ -322,7 +339,7 @@ numberOfXi = 3
 NumberOfGaussXi = 4
 
 geometricBasis = iron.Basis()
-geometricBasis.CreateStart(geometricbasisUserNumber)
+geometricBasis.CreateStart(geometricbasisUserNumber,context)
 if InterpolationType in (1,2,3,4):
     geometricBasis.type = iron.BasisTypes.LAGRANGE_HERMITE_TP
 elif InterpolationType in (7,8,9):
@@ -339,7 +356,7 @@ geometricBasis.CreateFinish()
 if(UsePressureBasis):
     # Define pressure basis
     pressureBasis = iron.Basis()
-    pressureBasis.CreateStart(pressureBasisUserNumber)
+    pressureBasis.CreateStart(pressureBasisUserNumber,context)
     if InterpolationType in (1,2,3,4):
         pressureBasis.type = iron.BasisTypes.LAGRANGE_HERMITE_TP
     elif InterpolationType in (7,8,9):
@@ -416,10 +433,20 @@ decomposition.type = iron.DecompositionTypes.CALCULATED
 decomposition.numberOfDomains = numberOfComputationalNodes
 decomposition.CreateFinish()
 
+#-----------------------------------------------------------------------------------------------------------
+#DECOMPOSER
+#-----------------------------------------------------------------------------------------------------------
+
+decomposer = iron.Decomposer()
+decomposer.CreateStart(decomposerUserNumber,worldRegion,worldWorkGroup)
+decompositionIndex = decomposer.DecompositionAdd(decomposition)
+decomposer.CreateFinish()
+
+
 # Create a field for the geometry
 geometricField = iron.Field()
 geometricField.CreateStart(geometricFieldUserNumber,region)
-geometricField.MeshDecompositionSet(decomposition)
+geometricField.DecompositionSet(decomposition)
 geometricField.TypeSet(iron.FieldTypes.GEOMETRIC)
 geometricField.VariableLabelSet(iron.FieldVariableTypes.U,"Geometry")
 geometricField.ComponentMeshComponentSet(iron.FieldVariableTypes.U,1,1)
@@ -451,7 +478,7 @@ geometricField.ParameterSetUpdateFinish(iron.FieldVariableTypes.U,iron.FieldPara
 fibreField = iron.Field()
 fibreField.CreateStart(fibreFieldUserNumber,region)
 fibreField.TypeSet(iron.FieldTypes.FIBRE)
-fibreField.MeshDecompositionSet(decomposition)
+fibreField.DecompositionSet(decomposition)
 fibreField.GeometricFieldSet(geometricField)
 fibreField.VariableLabelSet(iron.FieldVariableTypes.U,"Fibre")
 if InterpolationType == 4:
@@ -462,7 +489,7 @@ fibreField.CreateFinish()
 materialField = iron.Field()
 materialField.CreateStart(materialFieldUserNumber,region)
 materialField.TypeSet(iron.FieldTypes.MATERIAL)
-materialField.MeshDecompositionSet(decomposition)
+materialField.DecompositionSet(decomposition)
 materialField.GeometricFieldSet(geometricField)
 materialField.NumberOfVariablesSet(1)
 materialField.NumberOfComponentsSet(iron.FieldVariableTypes.U,2)
@@ -484,7 +511,7 @@ dependentField = iron.Field()
 dependentField.CreateStart(dependentFieldUserNumber,region)
 dependentField.VariableLabelSet(iron.FieldVariableTypes.U,"Dependent")
 dependentField.TypeSet(iron.FieldTypes.GEOMETRIC_GENERAL)  
-dependentField.MeshDecompositionSet(decomposition)
+dependentField.DecompositionSet(decomposition)
 dependentField.GeometricFieldSet(geometricField) 
 dependentField.DependentTypeSet(iron.FieldDependentTypes.DEPENDENT) 
 dependentField.NumberOfVariablesSet(2)
@@ -550,7 +577,7 @@ problem = iron.Problem()
 problemSpecification = [iron.ProblemClasses.ELASTICITY,
         iron.ProblemTypes.FINITE_ELASTICITY,
         iron.ProblemSubtypes.NONE]
-problem.CreateStart(problemUserNumber, problemSpecification)
+problem.CreateStart(problemUserNumber, context,problemSpecification)
 problem.CreateFinish()
 
 # Create control loops
@@ -858,5 +885,6 @@ fields = iron.Fields()
 fields.CreateRegion(region)
 fields.NodesExport("CylinderInflation","FORTRAN")
 fields.ElementsExport("CylinderInflation","FORTRAN")
+context.Destroy()
 fields.Finalise()
 print('Program complete')
